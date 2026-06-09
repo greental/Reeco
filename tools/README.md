@@ -44,3 +44,26 @@ python tools/trello_cli.py --board UZMr7YiD lists
 - Prefer read commands first: `lists`, `cards`, or `open`.
 - Before write commands (`add`, `move`), verify the target list/card names.
 - If multiple matches are reported, ask for clarification instead of guessing.
+
+## CSV task import
+
+A CSV manifest can be validated without Trello credentials:
+
+```bash
+python tools/trello_cli.py validate-csv tools/trelloTasks/reeco_trello_task_manifest.csv
+```
+
+After credentials are configured, import the manifest:
+
+```bash
+python tools/trello_cli.py import-csv tools/trelloTasks/reeco_trello_task_manifest.csv
+```
+
+Import behavior:
+
+- Creates missing lists in first-seen CSV order at the bottom of the board.
+- Creates/reuses labels from `Priority` and `Labels` columns.
+- Creates cards in the requested list with labels and description.
+- Skips existing cards by exact normalized title to avoid duplicates.
+- Use `--update-existing` to update matching cards instead of skipping them.
+- Use `--dry-run` to preview planned board changes.

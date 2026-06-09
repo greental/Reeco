@@ -1,0 +1,1183 @@
+List,Card Title,Priority,Labels,Test Command,Description
+Setup & Workflow,Create repo-local Git slice workflow,P0,"Tooling,Docs",npm run git:status,"Goal:
+Create the agent-facing Git workflow tools under tools/agent/ so every slice can be tested, committed, logged, and pushed.
+
+Implementation notes:
+- Use tools/agent/git-init.sh, git-slice.sh, git-status.sh.
+- Expose npm scripts: git:init, git:status, git:slice.
+- Add .cline/rules/git-workflow.md.
+
+Acceptance criteria:
+- npm run git:init works.
+- npm run git:status works.
+- git:slice runs tests before committing.
+- docs/SLICE_LOG.md is updated.
+- No secrets/node_modules/build artifacts are committed.
+
+Commit after:
+npm run git:slice -- ""create repo-local git slice workflow"" ""npm run git:status"""
+Setup & Workflow,Validate assignment files and constraints,P0,"Tooling,Tests,Risk",manual,"Goal:
+Confirm the assignment structure, uploaded CSVs, tests, required port, and source-code constraints before implementation.
+
+Implementation notes:
+- Do not modify tests/ or data/.
+- Capture any README/test mismatch in docs/IMPLEMENTATION_NOTES.md.
+
+Acceptance criteria:
+- Confirm backend/frontend code lives under src/.
+- Confirm API base is /api.
+- Confirm server listens on port 3000.
+- Confirm tests are authoritative when they disagree with README.
+
+Commit after:
+npm run git:slice -- ""validate assignment files and constraints"" ""manual"""
+Setup & Workflow,Create project skeleton,P0,"Tooling,Backend,Frontend",npm run build,"Goal:
+Create the initial Node.js TypeScript backend and React TypeScript frontend structure under src/.
+
+Implementation notes:
+- Keep structure simple and assignment-focused.
+- Do not implement business features in this card.
+
+Acceptance criteria:
+- Backend entrypoint exists.
+- Frontend app shell exists.
+- Shared types/config folders exist if useful.
+- Root scripts exist for dev/build/start/test helpers.
+
+Commit after:
+npm run git:slice -- ""create project skeleton"" ""npm run build"""
+Setup & Workflow,Configure environment and safe defaults,P0,"Tooling,Database,Security",npm run build,"Goal:
+Create safe config loading for PostgreSQL, Redis, server port, and runtime mode.
+
+Implementation notes:
+- Default DB should match assignment: localhost:5432 postgres/postgres order_ops.
+- Default Redis should match localhost:6379.
+- .env.example only, never real .env.
+
+Acceptance criteria:
+- .env.example exists.
+- Config can be overridden by environment variables.
+- Missing optional Redis does not crash basic API if not required.
+- .env is ignored by Git.
+
+Commit after:
+npm run git:slice -- ""configure environment and safe defaults"" ""npm run build"""
+Setup & Workflow,Add root test runner shortcuts,P1,"Tooling,Tests",npm run test:basic,"Goal:
+Add root scripts that run assignment tests from the tests folder when it exists.
+
+Implementation notes:
+- Scripts should fail clearly if tests/ is missing.
+
+Acceptance criteria:
+- Can run basic tests from root.
+- Can run filter/agg/anomaly/bulk/concurrent/perf/realtime/security tests.
+- Can run full grade command if available.
+
+Commit after:
+npm run git:slice -- ""add root test runner shortcuts"" ""npm run test:basic"""
+Data + DB Foundation,Explore CSV data and edge cases,P0,"Database,Risk,Tests",npm run data:inspect,"Goal:
+Analyze the CSV files before final schema/import design.
+
+Implementation notes:
+- Inspect orders, suppliers, products, categories.
+- Generate a short docs/DATA_NOTES.md.
+
+Acceptance criteria:
+- Record row counts: 50,000 orders, 500 suppliers, 5,000 products, 195 categories.
+- Identify null/empty warehouses.
+- Identify negative quantities.
+- Identify price mismatches.
+- Identify inactive suppliers with orders.
+- Identify timestamp anomalies.
+- Identify circular categories.
+- Identify XSS-like notes.
+
+Commit after:
+npm run git:slice -- ""explore csv data and edge cases"" ""npm run data:inspect"""
+Data + DB Foundation,Design PostgreSQL schema,P0,"Database,Backend",npm run db:migrate,"Goal:
+Create database schema for suppliers, categories, products, orders, jobs, and job_items.
+
+Implementation notes:
+- Use text IDs from CSVs as primary keys.
+- Add version/lock field to orders for optimistic concurrency.
+- Keep schema practical for tests and performance.
+
+Acceptance criteria:
+- Suppliers table supports active/rating/country.
+- Categories supports parent_id.
+- Products references category_id.
+- Orders references supplier_id and product_id.
+- Jobs and job_items support bulk progress.
+- Schema can be recreated from scratch.
+
+Commit after:
+npm run git:slice -- ""design postgresql schema"" ""npm run db:migrate"""
+Data + DB Foundation,Create migrations and indexes,P0,"Database,Performance",npm run db:migrate,"Goal:
+Implement migration scripts for all tables and performance indexes.
+
+Implementation notes:
+- Indexes should support filtering, sorting, joins, aggregations, anomaly checks, and job polling.
+
+Acceptance criteria:
+- Indexes exist for orders status, priority, supplier_id, warehouse, created_at, total_price, product_id.
+- Indexes exist for products category_id and lower/name search strategy.
+- Indexes exist for jobs/job_items status and job_id.
+- Migrations are repeatable or have a safe reset path.
+
+Commit after:
+npm run git:slice -- ""create migrations and indexes"" ""npm run db:migrate"""
+Data + DB Foundation,Implement CSV import pipeline,P0,"Database,Backend",npm run data:import,"Goal:
+Import all CSV seed data into PostgreSQL.
+
+Implementation notes:
+- Handle empty strings/nulls.
+- Parse booleans/numbers/timestamps safely.
+- Use batch inserts or COPY for speed.
+
+Acceptance criteria:
+- Imports all 4 CSVs.
+- Final counts match expected counts.
+- Import can reset and rerun cleanly.
+- No malformed rows silently disappear.
+- Import preserves notes as strings.
+
+Commit after:
+npm run git:slice -- ""implement csv import pipeline"" ""npm run data:import"""
+Data + DB Foundation,Implement recursive category lookup with cycle guard,P0,"Database,Backend,Risk",npm run test:basic,"Goal:
+Support product filtering by category including all descendant categories, while avoiding infinite loops from circular data.
+
+Implementation notes:
+- Can use recursive CTE with cycle protection or app-level traversal with visited set.
+
+Acceptance criteria:
+- GET /api/products?category=cat_001 includes child-category products.
+- Circular category data cannot hang/crash.
+- Category filter remains performant.
+
+Commit after:
+npm run git:slice -- ""implement recursive category lookup with cycle guard"" ""npm run test:basic"""
+Data + DB Foundation,Create database access layer,P0,"Backend,Database,Security",npm run build,"Goal:
+Create DB pool, query helper, transaction helper, and repository pattern.
+
+Implementation notes:
+- Use parameterized queries only.
+- Make transactions easy for PATCH and bulk jobs.
+
+Acceptance criteria:
+- DB helper centralizes connection handling.
+- Repository methods are typed.
+- Transaction helper supports commit/rollback.
+- No SQL interpolation for user values.
+
+Commit after:
+npm run git:slice -- ""create database access layer"" ""npm run build"""
+Basic API,Bootstrap backend server on port 3000,P0,Backend,npm run test:basic,"Goal:
+Create the HTTP server and /api route structure.
+
+Implementation notes:
+- Use Express/Fastify or a simple Node framework.
+- All responses should be JSON for API endpoints.
+
+Acceptance criteria:
+- Server listens on port 3000 by default.
+- Unknown routes return 404 JSON.
+- Content-Type is application/json for API responses.
+
+Commit after:
+npm run git:slice -- ""bootstrap backend server on port 3000"" ""npm run test:basic"""
+Basic API,Create response and error helpers,P0,"Backend,Security",npm run test:basic,"Goal:
+Standardize paginated list responses and error responses.
+
+Implementation notes:
+- List response shape: { data, total, limit, offset }.
+- Error shape: { error, code } where possible.
+
+Acceptance criteria:
+- All list endpoints use the same pagination shape.
+- 404 responses include string error.
+- 400/409 responses include string error.
+- Content-Type is application/json.
+
+Commit after:
+npm run git:slice -- ""create response and error helpers"" ""npm run test:basic"""
+Basic API,Implement GET /api/orders,P0,"Backend,Tests",npm run test:basic,"Goal:
+Return paginated orders.
+
+Implementation notes:
+- Default limit is 20.
+- Support limit and offset.
+- Return total count across all orders.
+
+Acceptance criteria:
+- GET /api/orders returns 200.
+- data is an array.
+- default data length <= 20.
+- total equals 50,000.
+- limit=50&offset=100 returns 50 rows.
+
+Commit after:
+npm run git:slice -- ""implement get /api/orders"" ""npm run test:basic"""
+Basic API,Implement GET /api/orders/:id,P0,"Backend,Tests",npm run test:basic,"Goal:
+Return a single order by ID with joined supplier and product names.
+
+Implementation notes:
+- Join suppliers and products.
+- Keep notes/status/priority fields intact.
+
+Acceptance criteria:
+- Existing order returns 200.
+- Response includes supplier_name.
+- Response includes product_name.
+- Missing order returns 404.
+
+Commit after:
+npm run git:slice -- ""implement get /api/orders/:id"" ""npm run test:basic"""
+Basic API,Implement PATCH /api/orders/:id,P0,"Backend,Tests,Concurrency",npm run test:basic,"Goal:
+Update order fields safely.
+
+Implementation notes:
+- Support status, priority, notes.
+- Reject invalid status.
+- Reject updates to cancelled orders.
+- Prepare for optimistic locking.
+
+Acceptance criteria:
+- Valid status update returns 200.
+- Updated status is returned.
+- Invalid status returns 400.
+- Cancelled order update returns 409.
+- Status changes publish order_updated hook if realtime is already present.
+
+Commit after:
+npm run git:slice -- ""implement patch /api/orders/:id"" ""npm run test:basic"""
+Basic API,Implement GET /api/suppliers,P0,"Backend,Tests",npm run test:basic,"Goal:
+Return paginated suppliers.
+
+Implementation notes:
+- Support limit and offset using shared helper.
+
+Acceptance criteria:
+- GET /api/suppliers returns 200.
+- data is an array.
+- total equals 500.
+- Content-Type is application/json.
+
+Commit after:
+npm run git:slice -- ""implement get /api/suppliers"" ""npm run test:basic"""
+Basic API,Implement GET /api/suppliers/:id,P0,"Backend,Tests",npm run test:basic,"Goal:
+Return a supplier with computed order_count and total_revenue.
+
+Implementation notes:
+- Use SQL aggregation over orders.
+- Return zero values safely if no orders.
+
+Acceptance criteria:
+- sup_042 returns 200.
+- Response includes order_count.
+- Response includes total_revenue.
+- Missing supplier returns 404.
+
+Commit after:
+npm run git:slice -- ""implement get /api/suppliers/:id"" ""npm run test:basic"""
+Basic API,Implement GET /api/products,P0,"Backend,Tests",npm run test:basic,"Goal:
+Return paginated products and support category recursive filtering.
+
+Implementation notes:
+- Use recursive category lookup card if already complete.
+
+Acceptance criteria:
+- GET /api/products returns 200.
+- total equals 5,000.
+- GET /api/products?category=cat_001 returns products across more than one category.
+- Content-Type is application/json.
+
+Commit after:
+npm run git:slice -- ""implement get /api/products"" ""npm run test:basic"""
+Basic API,Pass basic CRUD suite,P0,Tests,npm run test:basic,"Goal:
+Run and fix the full basic CRUD test suite.
+
+Implementation notes:
+- Do not move on until this is stable unless blocked by assignment constraints.
+
+Acceptance criteria:
+- All basic CRUD tests pass.
+- Commit and push the slice.
+
+Commit after:
+npm run git:slice -- ""pass basic crud suite"" ""npm run test:basic"""
+Filtering + Search,Implement order query parser and validation,P0,"Backend,Security,Tests",npm run test:filter,"Goal:
+Create a safe parser for /api/orders query parameters.
+
+Implementation notes:
+- Parse status, priority, supplier_id, warehouse, date_from, date_to, min_total, search, sort, order, limit, offset.
+- Use allowlists for sort/order.
+
+Acceptance criteria:
+- Invalid sort fields cannot inject SQL.
+- order only allows asc/desc.
+- limit is validated or clamped.
+- Parsed query object is typed.
+
+Commit after:
+npm run git:slice -- ""implement order query parser and validation"" ""npm run test:filter"""
+Filtering + Search,Implement status and priority filters,P0,"Backend,Tests",npm run test:filter,"Goal:
+Support status and priority filtering on GET /api/orders.
+
+Implementation notes:
+- Status supports single value and comma-separated values.
+
+Acceptance criteria:
+- ?status=pending works.
+- ?status=pending,approved works.
+- ?priority=critical works.
+- Filters combine correctly.
+
+Commit after:
+npm run git:slice -- ""implement status and priority filters"" ""npm run test:filter"""
+Filtering + Search,Implement supplier and warehouse filters,P0,"Backend,Tests",npm run test:filter,"Goal:
+Support supplier_id and warehouse filters on GET /api/orders.
+
+Implementation notes:
+- Use exact matching.
+- Warehouse may contain values like warehouse_east.
+
+Acceptance criteria:
+- ?supplier_id=sup_042 works.
+- ?warehouse=warehouse_east works.
+- Filters combine with status/priority.
+
+Commit after:
+npm run git:slice -- ""implement supplier and warehouse filters"" ""npm run test:filter"""
+Filtering + Search,Implement date range and min_total filters,P0,"Backend,Tests",npm run test:filter,"Goal:
+Support created_at date range and minimum total filters.
+
+Implementation notes:
+- date_from/date_to should be inclusive.
+- min_total means total_price >= value.
+
+Acceptance criteria:
+- date_from works.
+- date_to works inclusively.
+- date range works together.
+- min_total works.
+- Invalid numeric/date input is handled safely.
+
+Commit after:
+npm run git:slice -- ""implement date range and min_total filters"" ""npm run test:filter"""
+Filtering + Search,Implement product-name search,P0,"Backend,Database,Performance,Tests",npm run test:filter,"Goal:
+Support case-insensitive search on joined product name.
+
+Implementation notes:
+- Search applies to product_name.
+- Use parameterized query.
+- Consider lower(name) index or pg_trgm if available.
+
+Acceptance criteria:
+- ?search=hydraulic returns matching order rows.
+- Search combines with other filters.
+- No SQL injection risk.
+
+Commit after:
+npm run git:slice -- ""implement product-name search"" ""npm run test:filter"""
+Filtering + Search,Implement sorting,P0,"Backend,Security,Tests",npm run test:filter,"Goal:
+Support allowlisted sorting and direction on GET /api/orders.
+
+Implementation notes:
+- Sort by fields expected by tests such as total_price and created_at.
+- Do not allow arbitrary SQL field strings.
+
+Acceptance criteria:
+- sort=total_price&order=desc works.
+- sort=created_at&order=asc works.
+- Default sort is deterministic.
+- Invalid sort/order cannot break the query.
+
+Commit after:
+npm run git:slice -- ""implement sorting"" ""npm run test:filter"""
+Filtering + Search,Verify combined filters and pagination totals,P0,"Backend,Tests",npm run test:filter,"Goal:
+Ensure all filters combine freely and pagination shape remains correct.
+
+Implementation notes:
+- Use SQL builder that composes WHERE clauses safely.
+
+Acceptance criteria:
+- status + priority + sort + order + limit works.
+- Filtered total reflects all filters.
+- data length respects limit.
+- offset works with filters.
+
+Commit after:
+npm run git:slice -- ""verify combined filters and pagination totals"" ""npm run test:filter"""
+Filtering + Search,Pass filtering suite,P0,Tests,npm run test:filter,"Goal:
+Run and fix the full filtering test suite.
+
+Implementation notes:
+- Keep basic CRUD passing.
+
+Acceptance criteria:
+- All filtering tests pass.
+- Basic CRUD still passes.
+- Commit and push the slice.
+
+Commit after:
+npm run git:slice -- ""pass filtering suite"" ""npm run test:filter"""
+Aggregations,Implement GET /api/orders/stats base totals,P0,"Backend,Database,Tests",npm run test:agg,"Goal:
+Return dashboard-level total_orders, total_revenue, and avg_order_value.
+
+Implementation notes:
+- Calculate from all orders.
+- Use numeric precision suitable for tests.
+
+Acceptance criteria:
+- total_orders equals 50,000.
+- total_revenue is accurate.
+- avg_order_value is accurate.
+
+Commit after:
+npm run git:slice -- ""implement get /api/orders/stats base totals"" ""npm run test:agg"""
+Aggregations,Implement by_status aggregation,P0,"Backend,Database,Tests",npm run test:agg,"Goal:
+Add status distribution to /api/orders/stats.
+
+Implementation notes:
+- Include count and total_value per status.
+- Include all valid statuses even if count is 0.
+
+Acceptance criteria:
+- pending/approved/rejected/shipped/delivered/cancelled keys exist.
+- Each has count and total_value.
+- Values are accurate.
+
+Commit after:
+npm run git:slice -- ""implement by_status aggregation"" ""npm run test:agg"""
+Aggregations,Implement by_month aggregation,P0,"Backend,Database,Tests",npm run test:agg,"Goal:
+Add monthly order count and revenue trend to /api/orders/stats.
+
+Implementation notes:
+- Format month as YYYY-MM.
+- Data spans 2023-01 through 2024-12.
+
+Acceptance criteria:
+- Exactly 24 entries.
+- Sorted chronologically.
+- Each entry has month, order_count, revenue.
+
+Commit after:
+npm run git:slice -- ""implement by_month aggregation"" ""npm run test:agg"""
+Aggregations,Implement top_suppliers aggregation,P0,"Backend,Database,Tests",npm run test:agg,"Goal:
+Add top suppliers by revenue to /api/orders/stats.
+
+Implementation notes:
+- Join suppliers for names.
+- Sort descending by total_revenue.
+
+Acceptance criteria:
+- Exactly 10 entries.
+- Each has supplier_id, supplier_name, total_revenue.
+- Sorted descending.
+
+Commit after:
+npm run git:slice -- ""implement top_suppliers aggregation"" ""npm run test:agg"""
+Aggregations,Implement by_warehouse aggregation,P0,"Backend,Database,Tests",npm run test:agg,"Goal:
+Add warehouse distribution to /api/orders/stats.
+
+Implementation notes:
+- Treat null or empty warehouse as unassigned.
+
+Acceptance criteria:
+- Includes 5 warehouses plus unassigned if present.
+- Each entry has warehouse, count, total_value.
+- Unassigned includes null/empty warehouses.
+
+Commit after:
+npm run git:slice -- ""implement by_warehouse aggregation"" ""npm run test:agg"""
+Aggregations,Implement supplier performance endpoint,P0,"Backend,Database,Tests",npm run test:agg,"Goal:
+Implement GET /api/suppliers/:id/performance.
+
+Implementation notes:
+- avg_delivery_days: delivered orders updated_at-created_at days.
+- rejection_rate: rejected/total.
+- avg_order_value: avg total_price.
+- monthly_trend: per month order count.
+- price_consistency: unit_price within 20% of product base price.
+
+Acceptance criteria:
+- Endpoint returns 200 for valid supplier.
+- All required fields exist.
+- monthly_trend uses YYYY-MM.
+- price_consistency is 0..1.
+
+Commit after:
+npm run git:slice -- ""implement supplier performance endpoint"" ""npm run test:agg"""
+Aggregations,Optimize aggregation queries,P1,"Backend,Database,Performance",npm run test:perf,"Goal:
+Make aggregations performant enough for 50,000 orders.
+
+Implementation notes:
+- Use SQL grouping, indexes, and optional Redis/cache if needed.
+- Avoid heavy app-side loops where SQL can aggregate.
+
+Acceptance criteria:
+- /api/orders/stats p95 under 500ms.
+- /api/suppliers/sup_042/performance p95 under 500ms.
+- No stale cache after updates if caching is used.
+
+Commit after:
+npm run git:slice -- ""optimize aggregation queries"" ""npm run test:perf"""
+Aggregations,Pass aggregation suite,P0,Tests,npm run test:agg,"Goal:
+Run and fix the full aggregation test suite.
+
+Implementation notes:
+- Keep basic and filtering passing.
+
+Acceptance criteria:
+- All aggregation tests pass.
+- Commit and push the slice.
+
+Commit after:
+npm run git:slice -- ""pass aggregation suite"" ""npm run test:agg"""
+Anomaly Detection,Implement required anomaly rules,P0,"Backend,Database,Tests",npm run test:anomaly,"Goal:
+Implement GET /api/orders/anomalies with required data-quality rules.
+
+Implementation notes:
+- Required rules: price_mismatch, inactive_supplier, negative_quantity, timestamp_anomaly.
+
+Acceptance criteria:
+- Returns { data: [...] }.
+- Each anomaly has order_id.
+- anomaly_types is a non-empty string array.
+- severity is low/medium/high.
+- Orders can have multiple anomaly types.
+
+Commit after:
+npm run git:slice -- ""implement required anomaly rules"" ""npm run test:anomaly"""
+Anomaly Detection,Implement price mismatch anomaly,P0,"Backend,Database,Tests",npm run test:anomaly,"Goal:
+Flag orders where total_price differs from quantity * unit_price by more than 0.01.
+
+Implementation notes:
+- Use absolute difference.
+- Be careful with numeric precision.
+
+Acceptance criteria:
+- Sample expected price mismatch IDs are included.
+- Rule name includes price_mismatch or price-like text.
+
+Commit after:
+npm run git:slice -- ""implement price mismatch anomaly"" ""npm run test:anomaly"""
+Anomaly Detection,Implement inactive supplier anomaly,P0,"Backend,Database,Tests",npm run test:anomaly,"Goal:
+Flag orders belonging to inactive suppliers.
+
+Implementation notes:
+- Join suppliers table.
+- active false must be detected reliably.
+
+Acceptance criteria:
+- Sample inactive supplier order IDs are included.
+- Rule name includes inactive_supplier.
+
+Commit after:
+npm run git:slice -- ""implement inactive supplier anomaly"" ""npm run test:anomaly"""
+Anomaly Detection,Implement negative quantity and timestamp anomalies,P0,"Backend,Database,Tests",npm run test:anomaly,"Goal:
+Flag returns/negative quantities and impossible timestamps.
+
+Implementation notes:
+- negative_quantity: quantity < 0.
+- timestamp_anomaly: updated_at < created_at.
+
+Acceptance criteria:
+- Sample negative quantity IDs are included.
+- At least 80% of expected timestamp anomalies are flagged.
+- Rule names are test-friendly.
+
+Commit after:
+npm run git:slice -- ""implement negative quantity and timestamp anomalies"" ""npm run test:anomaly"""
+Anomaly Detection,Implement bonus anomaly rules,P1,"Backend,Database,Tests",npm run test:anomaly,"Goal:
+Add bonus anomaly types for price_spike, after_hours, and risky_supplier.
+
+Implementation notes:
+- price_spike: unit_price > 3x product base price.
+- after_hours: created_at outside business hours like 22:00-06:00 UTC.
+- risky_supplier: supplier has unusually high anomalous order rate.
+
+Acceptance criteria:
+- At least one price_spike is flagged.
+- At least one after_hours is flagged.
+- Risky supplier rule does not explode result size unreasonably.
+
+Commit after:
+npm run git:slice -- ""implement bonus anomaly rules"" ""npm run test:anomaly"""
+Anomaly Detection,Implement anomaly severity logic,P1,"Backend,Docs,Tests",npm run test:anomaly,"Goal:
+Classify anomalies as low, medium, or high.
+
+Implementation notes:
+- High for negative quantity, timestamp anomaly, or multiple anomalies.
+- Medium for price mismatch/inactive supplier.
+- Low for softer bonus rules if alone.
+
+Acceptance criteria:
+- Every anomaly has valid severity.
+- Severity rules are documented for ANOMALY_STRATEGY.md.
+- Severity logic is deterministic.
+
+Commit after:
+npm run git:slice -- ""implement anomaly severity logic"" ""npm run test:anomaly"""
+Anomaly Detection,Optimize anomaly endpoint,P1,"Backend,Database,Performance",npm run test:perf,"Goal:
+Make anomaly detection fast enough for the performance budget.
+
+Implementation notes:
+- Prefer SQL computation or efficient indexed joins.
+- Avoid repeated per-row DB calls.
+
+Acceptance criteria:
+- /api/orders/anomalies p95 under 1000ms.
+- Result shape remains correct.
+- Required sample anomalies still appear.
+
+Commit after:
+npm run git:slice -- ""optimize anomaly endpoint"" ""npm run test:perf"""
+Anomaly Detection,Pass anomaly suite,P0,Tests,npm run test:anomaly,"Goal:
+Run and fix the full anomaly test suite.
+
+Implementation notes:
+- Keep prior suites passing.
+
+Acceptance criteria:
+- All anomaly tests pass.
+- Commit and push the slice.
+
+Commit after:
+npm run git:slice -- ""pass anomaly suite"" ""npm run test:anomaly"""
+Bulk Jobs,Create jobs and job_items persistence,P0,"Backend,Database",npm run test:bulk,"Goal:
+Implement persistent job tracking for async bulk actions.
+
+Implementation notes:
+- Jobs track status and progress.
+- Job items track per-order result when useful.
+
+Acceptance criteria:
+- Job statuses include processing, completed, failed.
+- Progress includes total, completed, failed.
+- Job can be polled immediately after creation.
+
+Commit after:
+npm run git:slice -- ""create jobs and job_items persistence"" ""npm run test:bulk"""
+Bulk Jobs,Implement bulk endpoint aliases and payload variants,P0,"Backend,Tests,Risk",npm run test:bulk,"Goal:
+Support the README endpoint and test endpoint variants for bulk actions.
+
+Implementation notes:
+- Support /api/orders/bulk-action.
+- Support /api/orders/bulk.
+- Support /api/orders/bulk-actions.
+- Accept orderIds and order_ids.
+- Return jobId and job_id when helpful.
+
+Acceptance criteria:
+- POST /api/orders/bulk-action returns 202 with jobId.
+- POST /api/orders/bulk works for security tests.
+- POST /api/orders/bulk-actions works for concurrency tests.
+- Invalid action returns 400.
+- Empty IDs return 400.
+- More than 10,000 IDs returns 400.
+
+Commit after:
+npm run git:slice -- ""implement bulk endpoint aliases and payload variants"" ""npm run test:bulk"""
+Bulk Jobs,Implement async bulk processing,P0,"Backend,Performance,Tests",npm run test:bulk,"Goal:
+Make bulk POST return immediately and process work in background.
+
+Implementation notes:
+- Use in-process worker loop, Redis queue, or lightweight DB-backed queue.
+- For this assignment, simplest reliable background worker is acceptable.
+
+Acceptance criteria:
+- Bulk POST responds under 500ms.
+- 1000-order submission responds under 500ms.
+- API remains responsive while job runs.
+- 1000-order job completes within 30 seconds when enough pending orders exist.
+
+Commit after:
+npm run git:slice -- ""implement async bulk processing"" ""npm run test:bulk"""
+Bulk Jobs,Implement approve/reject/flag actions,P0,"Backend,Tests",npm run test:bulk,"Goal:
+Apply valid bulk actions to selected orders.
+
+Implementation notes:
+- approve -> approved.
+- reject -> rejected.
+- flag can store a flagged marker/reason without corrupting status.
+- Do not update cancelled orders.
+
+Acceptance criteria:
+- Valid orders are completed.
+- Missing IDs are failed.
+- Cancelled orders are failed/skipped.
+- Reason field is accepted and stored/logged if useful.
+
+Commit after:
+npm run git:slice -- ""implement approve/reject/flag actions"" ""npm run test:bulk"""
+Bulk Jobs,Implement GET /api/jobs/:id,P0,"Backend,Tests",npm run test:bulk,"Goal:
+Return job status and progress for polling.
+
+Implementation notes:
+- Return status and progress object.
+- Use both jobId/job_id compatibility where needed elsewhere.
+
+Acceptance criteria:
+- Valid job returns 200.
+- Response has status.
+- Response has progress.total/completed/failed.
+- Missing job returns 404.
+
+Commit after:
+npm run git:slice -- ""implement get /api/jobs/:id"" ""npm run test:bulk"""
+Bulk Jobs,Emit bulk_completed hook,P1,"Backend,Realtime",npm run test:realtime,"Goal:
+Publish a bulk_completed event when a bulk job finishes.
+
+Implementation notes:
+- If realtime endpoint is not implemented yet, create EventPublisher interface/hook for later.
+
+Acceptance criteria:
+- Event type is bulk_completed.
+- Data includes jobId.
+- Hook is called exactly when job transitions to completed/failed.
+
+Commit after:
+npm run git:slice -- ""emit bulk_completed hook"" ""npm run test:realtime"""
+Bulk Jobs,Pass bulk operations suite,P0,Tests,npm run test:bulk,"Goal:
+Run and fix the full bulk operations test suite.
+
+Implementation notes:
+- Keep previous suites passing.
+
+Acceptance criteria:
+- All bulk tests pass.
+- Commit and push the slice.
+
+Commit after:
+npm run git:slice -- ""pass bulk operations suite"" ""npm run test:bulk"""
+Concurrency,Implement optimistic locking for PATCH,P0,"Backend,Concurrency,Tests",npm run test:concurrent,"Goal:
+Ensure two simultaneous PATCH requests to the same order produce one 200 and one 409.
+
+Implementation notes:
+- Use version column or atomic conditional update.
+- Do not rely only on app memory.
+
+Acceptance criteria:
+- One concurrent PATCH succeeds.
+- The other concurrent PATCH returns 409.
+- 409 response includes error property.
+
+Commit after:
+npm run git:slice -- ""implement optimistic locking for patch"" ""npm run test:concurrent"""
+Concurrency,Prevent unsafe overlapping bulk processing,P0,"Backend,Concurrency,Tests",npm run test:concurrent,"Goal:
+Handle two bulk jobs with overlapping order IDs safely.
+
+Implementation notes:
+- Use row locks, SKIP LOCKED, idempotency, or atomic update rules.
+- Goal is no corrupt/double-processed state.
+
+Acceptance criteria:
+- Both overlapping jobs complete.
+- Combined completed+failed covers unique IDs.
+- Each job reports its own total.
+- No order status becomes invalid.
+
+Commit after:
+npm run git:slice -- ""prevent unsafe overlapping bulk processing"" ""npm run test:concurrent"""
+Concurrency,Ensure read consistency during bulk,P0,"Backend,Concurrency,Tests",npm run test:concurrent,"Goal:
+GET requests during bulk operations must return valid, consistent data.
+
+Implementation notes:
+- Use normal committed transactions.
+- Avoid partial writes that break aggregates.
+
+Acceptance criteria:
+- GET /api/orders/stats during bulk returns total_orders=50000.
+- GET /api/orders/:id during bulk returns valid status.
+- No corrupt/null required fields.
+
+Commit after:
+npm run git:slice -- ""ensure read consistency during bulk"" ""npm run test:concurrent"""
+Concurrency,Pass concurrency stress tests,P0,"Backend,Concurrency,Performance,Tests",npm run test:concurrent,"Goal:
+Support concurrent PATCH, bulk, and GET load.
+
+Implementation notes:
+- Tune DB pool size if necessary.
+- Ensure transactions do not deadlock under test load.
+
+Acceptance criteria:
+- 10 concurrent PATCH to different orders succeed.
+- 5 non-overlapping bulk actions complete.
+- 50 concurrent GET /api/orders return 200 quickly.
+- Commit and push the slice.
+
+Commit after:
+npm run git:slice -- ""pass concurrency stress tests"" ""npm run test:concurrent"""
+Realtime Events,Implement /api/events SSE stream,P0,"Backend,Realtime,Tests",npm run test:realtime,"Goal:
+Expose realtime event stream using Server-Sent Events at /api/events.
+
+Implementation notes:
+- SSE is simpler than WebSocket and tests auto-detect either.
+- Use data: JSON lines.
+
+Acceptance criteria:
+- Client can connect with Accept: text/event-stream.
+- Connection stays open.
+- Disconnect cleanup works.
+- Events are JSON objects with type and data.
+
+Commit after:
+npm run git:slice -- ""implement /api/events sse stream"" ""npm run test:realtime"""
+Realtime Events,Broadcast order_updated events,P0,"Backend,Realtime,Tests",npm run test:realtime,"Goal:
+Emit order_updated whenever an order status changes.
+
+Implementation notes:
+- Wire PATCH and bulk status updates to EventPublisher.
+
+Acceptance criteria:
+- Event arrives within 5s.
+- Event type is order_updated.
+- Data includes id, old_status, new_status, updated_at.
+- Multiple clients receive broadcast events.
+
+Commit after:
+npm run git:slice -- ""broadcast order_updated events"" ""npm run test:realtime"""
+Realtime Events,Support supplier_id filtered subscriptions,P0,"Backend,Realtime,Tests",npm run test:realtime,"Goal:
+Allow clients to connect to /api/events?supplier_id=sup_042 and receive only that supplier's events.
+
+Implementation notes:
+- Events need supplier_id available at publish time or lookup.
+
+Acceptance criteria:
+- Filtered client receives matching supplier events.
+- Filtered client does not receive unrelated supplier events.
+- Unfiltered clients still receive all events.
+
+Commit after:
+npm run git:slice -- ""support supplier_id filtered subscriptions"" ""npm run test:realtime"""
+Realtime Events,Broadcast bulk_completed events,P0,"Backend,Realtime,Tests",npm run test:realtime,"Goal:
+Emit realtime event when a bulk job completes.
+
+Implementation notes:
+- Reuse bulk_completed hook from bulk slice.
+
+Acceptance criteria:
+- Event type is bulk_completed.
+- Data includes jobId.
+- Event arrives within test timeout.
+
+Commit after:
+npm run git:slice -- ""broadcast bulk_completed events"" ""npm run test:realtime"""
+Realtime Events,Pass realtime suite,P0,Tests,npm run test:realtime,"Goal:
+Run and fix the full realtime test suite.
+
+Implementation notes:
+- Keep prior suites passing.
+
+Acceptance criteria:
+- All realtime tests pass.
+- Commit and push the slice.
+
+Commit after:
+npm run git:slice -- ""pass realtime suite"" ""npm run test:realtime"""
+Performance + Security,Harden input validation,P0,"Backend,Security,Tests",npm run test:security,"Goal:
+Validate API bodies and query params to prevent invalid state and obvious injection payloads.
+
+Implementation notes:
+- Centralize validation if possible.
+- Return JSON error responses.
+
+Acceptance criteria:
+- PATCH with SQL injection-like status returns 400.
+- Invalid status returns 400.
+- Bulk with 10001 IDs returns 400.
+- limit=-1 returns 400 or sensible clamped limit <=100.
+
+Commit after:
+npm run git:slice -- ""harden input validation"" ""npm run test:security"""
+Performance + Security,Audit SQL injection protection,P0,"Backend,Security,Database",npm run test:security,"Goal:
+Ensure every user value uses parameterized queries and every dynamic SQL part is allowlisted.
+
+Implementation notes:
+- Audit repositories and query builders.
+- Sort fields/order direction must never be directly interpolated from user input.
+
+Acceptance criteria:
+- No user values interpolated into SQL.
+- Sort field allowlist exists.
+- Order direction allowlist exists.
+- Security tests pass.
+
+Commit after:
+npm run git:slice -- ""audit sql injection protection"" ""npm run test:security"""
+Performance + Security,Handle XSS payloads safely,P0,"Backend,Frontend,Security,Tests",npm run test:security,"Goal:
+Allow notes/reason strings containing script-like content without rendering raw HTML or changing content type.
+
+Implementation notes:
+- Backend should return JSON.
+- Frontend should render notes as text only.
+
+Acceptance criteria:
+- PATCH notes with script tag returns JSON.
+- notes is still a string.
+- Bulk reason with XSS-like payload is accepted if otherwise valid.
+- Frontend does not use dangerouslySetInnerHTML for notes.
+
+Commit after:
+npm run git:slice -- ""handle xss payloads safely"" ""npm run test:security"""
+Performance + Security,Optimize list and search endpoints,P1,"Backend,Database,Performance,Tests",npm run test:perf,"Goal:
+Meet p95 performance budgets for order list, filtered list, and search.
+
+Implementation notes:
+- Use indexes, limit/offset efficiently, and avoid N+1 joins.
+
+Acceptance criteria:
+- GET /api/orders p95 < 100ms.
+- GET /api/orders?status=pending&sort=created_at p95 < 200ms.
+- GET /api/orders?search=hydraulic p95 < 300ms.
+
+Commit after:
+npm run git:slice -- ""optimize list and search endpoints"" ""npm run test:perf"""
+Performance + Security,"Optimize stats, performance, and anomalies endpoints",P1,"Backend,Database,Performance,Tests",npm run test:perf,"Goal:
+Meet p95 performance budgets for heavier endpoints.
+
+Implementation notes:
+- Prefer SQL aggregations.
+- Add caching only if necessary and safe.
+
+Acceptance criteria:
+- GET /api/orders/stats p95 < 500ms.
+- GET /api/suppliers/sup_042/performance p95 < 500ms.
+- GET /api/orders/anomalies p95 < 1000ms.
+
+Commit after:
+npm run git:slice -- ""optimize stats, performance, and anomalies endpoints"" ""npm run test:perf"""
+Performance + Security,Verify data completeness,P0,"Backend,Database,Tests",npm run test:perf,"Goal:
+Ensure tests see the full imported dataset.
+
+Implementation notes:
+- Run import from clean DB before checking.
+
+Acceptance criteria:
+- Orders total matches expected count.
+- Suppliers total matches expected count.
+- Products total matches expected count if tested.
+
+Commit after:
+npm run git:slice -- ""verify data completeness"" ""npm run test:perf"""
+Performance + Security,Pass performance and security suites,P0,Tests,npm run test:perf && npm run test:security,"Goal:
+Run and fix performance and security test suites.
+
+Implementation notes:
+- Keep all previous suites passing.
+
+Acceptance criteria:
+- Performance tests pass.
+- Security tests pass.
+- Commit and push the slice.
+
+Commit after:
+npm run git:slice -- ""pass performance and security suites"" ""npm run test:perf && npm run test:security"""
+Frontend,Bootstrap React TypeScript frontend shell,P2,"Frontend,Tooling",npm run build,"Goal:
+Create the frontend app shell, layout, navigation, and API client wiring.
+
+Implementation notes:
+- Frontend consumes the backend API.
+- Keep design clean and assignment-focused.
+
+Acceptance criteria:
+- App loads in browser.
+- Navigation exists for Orders, Dashboard, Suppliers.
+- Build passes.
+
+Commit after:
+npm run git:slice -- ""bootstrap react typescript frontend shell"" ""npm run build"""
+Frontend,Create typed frontend API client,P2,"Frontend,Backend",npm run build,"Goal:
+Centralize API calls and typed responses.
+
+Implementation notes:
+- Include loading/error helper patterns.
+- Support all endpoints needed by frontend views.
+
+Acceptance criteria:
+- Client supports orders list/detail/patch.
+- Client supports suppliers/products.
+- Client supports stats/performance.
+- Client supports bulk actions and jobs.
+- Client handles API errors.
+
+Commit after:
+npm run git:slice -- ""create typed frontend api client"" ""npm run build"""
+Frontend,Build orders table view,P2,Frontend,npm run build,"Goal:
+Create paginated server-side orders table.
+
+Implementation notes:
+- Use backend pagination/filtering/sorting.
+- Keep table usable with 50,000 records.
+
+Acceptance criteria:
+- Shows order rows.
+- Supports server-side pagination.
+- Sortable columns.
+- Friendly empty/loading/error states.
+
+Commit after:
+npm run git:slice -- ""build orders table view"" ""npm run build"""
+Frontend,Build filters and search UI,P2,Frontend,npm run build,"Goal:
+Add filter controls to the orders table.
+
+Implementation notes:
+- Filters: status, priority, supplier, warehouse, date range.
+- Search product names.
+- Sync controls to API query params.
+
+Acceptance criteria:
+- Filters call server-side API.
+- Search works.
+- Clear filters works.
+- Empty state is meaningful.
+
+Commit after:
+npm run git:slice -- ""build filters and search ui"" ""npm run build"""
+Frontend,Build bulk action UX,P2,"Frontend,Backend",npm run build,"Goal:
+Allow multi-select orders and bulk approve/reject/flag actions with job progress.
+
+Implementation notes:
+- Use /api/orders/bulk-action or compatible alias.
+- Poll /api/jobs/:id.
+
+Acceptance criteria:
+- Rows can be selected.
+- User chooses action.
+- Confirmation step exists.
+- Progress is displayed.
+- Completed/failed counts shown.
+
+Commit after:
+npm run git:slice -- ""build bulk action ux"" ""npm run build"""
+Frontend,Build analytics dashboard,P2,Frontend,npm run build,"Goal:
+Show charts/cards from /api/orders/stats.
+
+Implementation notes:
+- Minimum: status distribution, monthly volume trend, top suppliers by revenue.
+
+Acceptance criteria:
+- Stats are loaded from API.
+- Charts or readable visual summaries exist.
+- Loading/error/empty states exist.
+
+Commit after:
+npm run git:slice -- ""build analytics dashboard"" ""npm run build"""
+Frontend,Build supplier detail view,P2,Frontend,npm run build,"Goal:
+Create supplier detail page with performance metrics and order history.
+
+Implementation notes:
+- Click a supplier from suppliers list or dashboard to open detail page.
+
+Acceptance criteria:
+- Shows supplier info.
+- Shows order_count and total_revenue.
+- Shows performance metrics.
+- Shows supplier order history.
+
+Commit after:
+npm run git:slice -- ""build supplier detail view"" ""npm run build"""
+Frontend,Frontend polish and safety pass,P2,"Frontend,Security,Polish",npm run build,"Goal:
+Improve visual polish and ensure safe rendering.
+
+Implementation notes:
+- No raw HTML rendering of notes.
+- Make the dashboard pleasant and readable.
+
+Acceptance criteria:
+- Consistent spacing/buttons/background.
+- All views have loading/error/empty states.
+- Notes render as plain text.
+- Responsive enough for laptop browser.
+
+Commit after:
+npm run git:slice -- ""frontend polish and safety pass"" ""npm run build"""
+Documentation + Submission,Write ARCHITECTURE.md,P0,Docs,manual,"Goal:
+Document the system architecture and tradeoffs.
+
+Implementation notes:
+- Be concise but interview/reviewer friendly.
+- Explain why choices were made.
+
+Acceptance criteria:
+- Explains project structure.
+- Explains database schema.
+- Explains indexing strategy.
+- Explains concurrency handling.
+- Explains background processing.
+- Explains realtime events.
+- Explains tradeoffs.
+
+Commit after:
+npm run git:slice -- ""write architecture.md"" ""manual"""
+Documentation + Submission,Write ANOMALY_STRATEGY.md,P0,Docs,manual,"Goal:
+Document anomaly detection rules, severity, findings, and future improvements.
+
+Implementation notes:
+- Use actual findings from CSV exploration.
+
+Acceptance criteria:
+- Required rules described.
+- Bonus rules described.
+- Severity logic described.
+- Data patterns discovered.
+- Improvements with more time listed.
+
+Commit after:
+npm run git:slice -- ""write anomaly_strategy.md"" ""manual"""
+Documentation + Submission,Create final runbook,P1,"Docs,Tooling",manual,"Goal:
+Create a short reviewer-friendly runbook for setup, import, start, and tests.
+
+Implementation notes:
+- Could be in README addition or docs/RUNBOOK.md if not modifying assignment README.
+
+Acceptance criteria:
+- Includes docker-compose up.
+- Includes install/build commands.
+- Includes data import command.
+- Includes server start command.
+- Includes test commands.
+
+Commit after:
+npm run git:slice -- ""create final runbook"" ""manual"""
+Documentation + Submission,Run final test sweep and grade,P0,"Tests,Docs",npm run grade,"Goal:
+Run the final test and grading flow from a clean DB state.
+
+Implementation notes:
+- Re-import data before final run.
+- Do not commit huge test artifacts unless requested.
+
+Acceptance criteria:
+- Basic/filter/agg/anomaly/bulk/concurrent/perf/realtime/security pass as much as possible.
+- Grade report reviewed.
+- Known failures documented if any.
+
+Commit after:
+npm run git:slice -- ""run final test sweep and grade"" ""npm run grade"""
+Documentation + Submission,Submission cleanup and final commit,P0,"Docs,Tooling",npm run git:status,"Goal:
+Prepare final repository state for submission.
+
+Implementation notes:
+- Check git status, ignored files, and accidental test/data changes.
+
+Acceptance criteria:
+- No secrets committed.
+- No node_modules committed.
+- No data/tests modified.
+- Git history has small meaningful commits.
+- Final commit/push done.
+
+Commit after:
+npm run git:slice -- ""submission cleanup and final commit"" ""npm run git:status"""
+Done,Move completed cards here,P3,Tooling,manual,"Goal:
+Use this list for finished Trello cards after implementation and verification.
+
+Implementation notes:
+- This is a placeholder card only if your Trello import requires at least one card in Done.
+
+Acceptance criteria:
+- Completed cards are moved here after tests pass and slice is committed.
+
+Commit after:
+npm run git:slice -- ""move completed cards here"" ""manual"""

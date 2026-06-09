@@ -7,6 +7,7 @@ Default board: https://trello.com/b/UZMr7YiD/reeco
 """
 
 import argparse
+import csv
 import os
 import sys
 
@@ -69,6 +70,240 @@ def get_lists(board_id, params):
     )
     response.raise_for_status()
     return response.json()
+
+
+def normalize_name(name):
+    return " ".join((name or "").strip().lower().split())
+
+
+def get_cards(board_id, params, fields="name,id,idList,desc,url,idLabels"):
+    response = requests.get(
+        f"{BASE}/boards/{board_id}/cards",
+        params={**params, "fields": fields},
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def get_labels(board_id, params):
+    response = requests.get(
+        f"{BASE}/boards/{board_id}/labels",
+        params={**params, "fields": "name,id,color"},
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def create_list(board_id, params, name):
+    response = requests.post(
+        f"{BASE}/lists",
+        params=params,
+        json={"name": name, "idBoard": board_id, "pos": "bottom"},
+        timeout=30,
+    )
+    response.raise_for_status()
+    created = response.json()
+    print(f"Created list {created['name']!r}")
+    return created
+
+
+def create_label(board_id, params, name, color=None):
+    response = requests.post(
+        f"{BASE}/labels",
+        params=params,
+        json={"name": name, "idBoard": board_id, "color": color},
+        timeout=30,
+    )
+    response.raise_for_status()
+    created = response.json()
+    print(f"Created label {created['name']!r}")
+    return created
+
+
+def split_labels(raw_labels):
+    return [label.strip() for label in (raw_labels or "").split(",") if label.strip()]
+
+
+def build_manifest_description(row):
+    parts = []
+    description = (row.get("Description") or "").strip()
+    if description:
+        parts.append(description)
+    priority = (row.get("Priority") or "").strip()
+    test_command = (row.get("Test Command") or "").strip()
+    metadata = []
+    if priority:
+        metadata.append(f"Priority: {priority}")
+    if test_command:
+        metadata.append(f"Test command: `{test_command}`")
+    if metadata:
+        parts.append("\n".join(metadata))
+    return "\n\n---\n".join(parts)
+
+
+def read_manifest_rows(csv_path):
+    required = {"List", "Card Title", "Priority", "Labels", "Test Command", "Description"}
+    with open(csv_path, newline="", encoding="utf-8-sig") as file:
+        reader = csv.DictReader(file)
+        missing = required - set(reader.fieldnames or [])
+        if missing:
+            raise ValueError(f"CSV is missing required columns: {sorted(missing)}")
+        rows = []
+        for index, row in enumerate(reader, start=2):
+            list_name = (row.get("List") or "").strip()
+            title = (row.get("Card Title") or "").strip()
+            if not list_name or not title:
+                raise ValueError(f"CSV row {index} must include List and Card Title")
+            row["List"] = list_name
+            row["Card Title"] = title
+            rows.append(row)
+    return rows
+
+
+def cmd_validate_csv(args, params=None):
+    try:
+        rows = read_manifest_rows(args.csv_path)
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+
+    lists = []
+    labels = set()
+    titles = set()
+    duplicate_titles = set()
+    for row in rows:
+        if row["List"] not in lists:
+            lists.append(row["List"])
+        title_key = normalize_name(row["Card Title"])
+        if title_key in titles:
+            duplicate_titles.add(row["Card Title"])
+        titles.add(title_key)
+        if row.get("Priority"):
+            labels.add(row["Priority"].strip())
+        labels.update(split_labels(row.get("Labels")))
+
+    print(f"CSV rows: {len(rows)}")
+    print(f"Lists: {len(lists)} -> {', '.join(lists)}")
+    print(f"Labels: {len(labels)} -> {', '.join(sorted(labels))}")
+    if duplicate_titles:
+        print(f"Duplicate card titles in CSV: {sorted(duplicate_titles)}", file=sys.stderr)
+        return 1
+    print("CSV validation passed.")
+    return 0
+
+
+def cmd_import_csv(args, params):
+    try:
+        rows = read_manifest_rows(args.csv_path)
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+
+    board_id = get_board_id(args.board, params)
+    existing_lists = {normalize_name(item["name"]): item for item in get_lists(board_id, params)}
+    existing_labels = {normalize_name(item["name"]): item for item in get_labels(board_id, params) if item.get("name")}
+    existing_cards = {normalize_name(item["name"]): item for item in get_cards(board_id, params)}
+
+    created_lists = 0
+    created_labels = 0
+    created_cards = 0
+    updated_cards = 0
+    skipped_cards = 0
+
+    needed_lists = []
+    needed_label_names = []
+    for row in rows:
+        if row["List"] not in needed_lists:
+            needed_lists.append(row["List"])
+        label_names = []
+        if row.get("Priority"):
+            label_names.append(row["Priority"].strip())
+        label_names.extend(split_labels(row.get("Labels")))
+        for label_name in label_names:
+            if label_name and label_name not in needed_label_names:
+                needed_label_names.append(label_name)
+
+    for list_name in needed_lists:
+        key = normalize_name(list_name)
+        if key in existing_lists:
+            continue
+        if args.dry_run:
+            print(f"Would create list {list_name!r}")
+            existing_lists[key] = {"name": list_name, "id": "dry-run"}
+        else:
+            existing_lists[key] = create_list(board_id, params, list_name)
+        created_lists += 1
+
+    label_colors = ["red", "orange", "yellow", "green", "blue", "purple", "pink", "sky", "lime", "black", None]
+    for index, label_name in enumerate(needed_label_names):
+        key = normalize_name(label_name)
+        if key in existing_labels:
+            continue
+        if args.dry_run:
+            print(f"Would create label {label_name!r}")
+            existing_labels[key] = {"name": label_name, "id": "dry-run"}
+        else:
+            existing_labels[key] = create_label(board_id, params, label_name, label_colors[index % len(label_colors)])
+        created_labels += 1
+
+    for row in rows:
+        title = row["Card Title"]
+        title_key = normalize_name(title)
+        target_list = existing_lists[normalize_name(row["List"])]
+        label_names = []
+        if row.get("Priority"):
+            label_names.append(row["Priority"].strip())
+        label_names.extend(split_labels(row.get("Labels")))
+        label_ids = [existing_labels[normalize_name(name)]["id"] for name in label_names if normalize_name(name) in existing_labels]
+        description = build_manifest_description(row)
+
+        if title_key in existing_cards:
+            card = existing_cards[title_key]
+            if not args.update_existing:
+                print(f"Skipping existing card {title!r}")
+                skipped_cards += 1
+                continue
+            if args.dry_run:
+                print(f"Would update existing card {title!r}")
+            else:
+                body = {"desc": description, "idList": target_list["id"]}
+                response = requests.put(f"{BASE}/cards/{card['id']}", params=params, json=body, timeout=30)
+                response.raise_for_status()
+                existing_label_ids = set(card.get("idLabels") or [])
+                for label_id in label_ids:
+                    if label_id not in existing_label_ids:
+                        label_response = requests.post(
+                            f"{BASE}/cards/{card['id']}/idLabels",
+                            params=params,
+                            json={"value": label_id},
+                            timeout=30,
+                        )
+                        label_response.raise_for_status()
+            updated_cards += 1
+            continue
+
+        body = {"name": title, "idList": target_list["id"], "desc": description}
+        if label_ids:
+            body["idLabels"] = ",".join(label_ids)
+        if args.dry_run:
+            print(f"Would create card {title!r} in {target_list['name']!r}")
+            existing_cards[title_key] = {"name": title, "id": "dry-run", "idLabels": label_ids}
+        else:
+            response = requests.post(f"{BASE}/cards", params=params, json=body, timeout=30)
+            response.raise_for_status()
+            created = response.json()
+            existing_cards[title_key] = created
+            print(f"Created card {created['name']!r} in {target_list['name']!r}")
+        created_cards += 1
+
+    print(
+        "Import summary: "
+        f"rows={len(rows)}, created_lists={created_lists}, created_labels={created_labels}, "
+        f"created_cards={created_cards}, updated_cards={updated_cards}, skipped_cards={skipped_cards}"
+    )
+    return 0
 
 
 def cmd_lists(args, params):
@@ -186,6 +421,14 @@ def main():
     subparsers.add_parser("lists", help="List all lists on the board")
     subparsers.add_parser("cards", help="List all cards and their list")
 
+    validate_parser = subparsers.add_parser("validate-csv", help="Validate a Trello task CSV manifest without API access")
+    validate_parser.add_argument("csv_path", help="Path to CSV manifest")
+
+    import_parser = subparsers.add_parser("import-csv", help="Import cards from a Trello task CSV manifest")
+    import_parser.add_argument("csv_path", help="Path to CSV manifest")
+    import_parser.add_argument("--dry-run", action="store_true", help="Show planned changes without writing to Trello")
+    import_parser.add_argument("--update-existing", action="store_true", help="Update existing exact-title cards instead of skipping them")
+
     move_parser = subparsers.add_parser("move", help="Move a card to a list by name")
     move_parser.add_argument("card_name", help="Card name (partial match)")
     move_parser.add_argument("list_name", help="Target list name (partial match)")
@@ -200,12 +443,18 @@ def main():
     open_parser.add_argument("card_name", help="Card name (partial match)")
 
     args = parser.parse_args()
+
+    if args.cmd == "validate-csv":
+        return cmd_validate_csv(args)
+
     params = auth()
 
     if args.cmd == "lists":
         return cmd_lists(args, params)
     if args.cmd == "cards":
         return cmd_cards(args, params)
+    if args.cmd == "import-csv":
+        return cmd_import_csv(args, params)
     if args.cmd == "move":
         return cmd_move(args, params)
     if args.cmd == "add":
