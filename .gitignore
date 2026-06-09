@@ -8,3 +8,6 @@ Thumbs.db
 build/
 coverage/
 .vite/
+tools/.env
+tools/__pycache__/
+tools/*.pyc
