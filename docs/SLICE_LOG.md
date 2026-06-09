@@ -14,3 +14,9 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: 6c6d4a3
 
+## 2026-06-09T11:52:38Z - add trello csv importer
+
+- Test command: `python -m py_compile tools/trello_cli.py && python tools/trello_cli.py validate-csv tools/trelloTasks/reeco_trello_task_manifest.csv`
+- Test result: passed
+- Commit hash: 1fa9f53
+
