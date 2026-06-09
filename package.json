@@ -18,7 +18,8 @@
     "git:status": "bash tools/agent/git-status.sh",
     "git:slice": "bash tools/agent/git-slice.sh",
     "test": "bash tools/run-tests.sh all",
-    "test:check": "bash tools/run-tests.sh check"
+    "test:check": "bash tools/run-tests.sh check",
+    "data:inspect": "python tools/inspect_data.py"
   },
   "dependencies": {
     "express": "^4.19.2",
