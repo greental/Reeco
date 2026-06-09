@@ -1,0 +1,7 @@
+{
+  "scripts": {
+    "git:init": "bash scripts/git-init.sh",
+    "git:status": "bash scripts/git-status.sh",
+    "git:slice": "bash scripts/git-slice.sh"
+  }
+}
