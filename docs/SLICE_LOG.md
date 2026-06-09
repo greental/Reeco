@@ -38,3 +38,9 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: 05aadd7
 
+## 2026-06-09T12:53:30Z - add root test runner shortcuts
+
+- Test command: `npm run test:check && npm run build`
+- Test result: passed
+- Commit hash: cfad739
+
