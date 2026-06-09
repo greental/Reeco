@@ -36,7 +36,7 @@ Records completed implementation slices committed with the repo-local Git workfl
 LOG
 fi
 
-git add .gitignore docs/SLICE_LOG.md scripts/git-init.sh scripts/git-slice.sh scripts/git-status.sh package.json .cline/rules/git-workflow.md 2>/dev/null || true
+git add .gitignore docs/SLICE_LOG.md tools/agent/git-init.sh tools/agent/git-slice.sh tools/agent/git-status.sh package.json .cline/rules/git-workflow.md 2>/dev/null || true
 
 if git diff --cached --quiet; then
   echo "No changes to commit."

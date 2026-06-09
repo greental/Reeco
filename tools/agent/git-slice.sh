@@ -6,7 +6,7 @@ TEST_COMMAND="${2:-}"
 TEST_RESULT="not run"
 
 if [ -z "$SLICE_NAME" ]; then
-  echo "Usage: ./scripts/git-slice.sh \"slice name\" \"optional test command\"" >&2
+  echo "Usage: ./tools/agent/git-slice.sh \"slice name\" \"optional test command\"" >&2
   exit 1
 fi
 
