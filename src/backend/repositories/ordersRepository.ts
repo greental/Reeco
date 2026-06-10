@@ -105,6 +105,17 @@ export interface OrdersStats {
   by_warehouse: Array<{ warehouse: string; count: number; total_value: number }>;
 }
 
+interface OrderAnomalyRow {
+  order_id: string;
+  anomaly_types: string[];
+}
+
+export interface OrderAnomaly {
+  order_id: string;
+  anomaly_types: string[];
+  severity: 'low' | 'medium' | 'high';
+}
+
 export interface OrderPatch {
   status?: OrderStatus;
   priority?: OrderPriority;
@@ -307,6 +318,64 @@ export class OrdersRepository extends BaseRepository {
     };
   }
 
+  async getAnomalies(): Promise<OrderAnomaly[]> {
+    const rows = await this.rows<OrderAnomalyRow>(
+      `
+        WITH base_flags AS (
+          SELECT o.id AS order_id,
+                 o.supplier_id,
+                 ABS(o.total_price - (o.quantity * o.unit_price)) > 0.01 AS price_mismatch,
+                 NOT s.active AS inactive_supplier,
+                 o.quantity < 0 AS negative_quantity,
+                 o.updated_at < o.created_at AS timestamp_anomaly,
+                 p.price > 0 AND o.unit_price > (p.price * 3) AS price_spike,
+                 EXTRACT(HOUR FROM o.created_at AT TIME ZONE 'UTC') >= 22
+                   OR EXTRACT(HOUR FROM o.created_at AT TIME ZONE 'UTC') < 6 AS after_hours
+          FROM orders o
+          JOIN suppliers s ON s.id = o.supplier_id
+          JOIN products p ON p.id = o.product_id
+        ),
+        supplier_risk AS (
+          SELECT supplier_id
+          FROM base_flags
+          GROUP BY supplier_id
+          HAVING AVG(
+            CASE
+              WHEN price_mismatch OR inactive_supplier OR negative_quantity OR timestamp_anomaly OR price_spike THEN 1.0
+              ELSE 0.0
+            END
+          ) > 0.5
+        )
+        SELECT base_flags.order_id,
+               array_remove(ARRAY[
+                 CASE WHEN price_mismatch THEN 'price_mismatch' END,
+                 CASE WHEN inactive_supplier THEN 'inactive_supplier' END,
+                 CASE WHEN negative_quantity THEN 'negative_quantity' END,
+                 CASE WHEN timestamp_anomaly THEN 'timestamp_anomaly' END,
+                 CASE WHEN price_spike THEN 'price_spike' END,
+                 CASE WHEN after_hours THEN 'after_hours' END,
+                 CASE WHEN supplier_risk.supplier_id IS NOT NULL THEN 'risky_supplier' END
+               ], NULL)::text[] AS anomaly_types
+        FROM base_flags
+        LEFT JOIN supplier_risk ON supplier_risk.supplier_id = base_flags.supplier_id
+        WHERE price_mismatch
+           OR inactive_supplier
+           OR negative_quantity
+           OR timestamp_anomaly
+           OR price_spike
+           OR after_hours
+           OR supplier_risk.supplier_id IS NOT NULL
+        ORDER BY base_flags.order_id
+      `,
+    );
+
+    return rows.map((row) => ({
+      order_id: row.order_id,
+      anomaly_types: row.anomaly_types,
+      severity: classifyAnomalySeverity(row.anomaly_types),
+    }));
+  }
+
   async getStatus(id: string): Promise<{ status: OrderStatus } | null> {
     return this.one<{ status: OrderStatus }>('SELECT status FROM orders WHERE id = $1', [id]);
   }
@@ -349,4 +418,21 @@ export class OrdersRepository extends BaseRepository {
       params,
     );
   }
+}
+
+function classifyAnomalySeverity(types: string[]): OrderAnomaly['severity'] {
+  if (
+    types.length >= 2 ||
+    types.includes('negative_quantity') ||
+    types.includes('inactive_supplier') ||
+    types.includes('price_spike')
+  ) {
+    return 'high';
+  }
+
+  if (types.includes('price_mismatch') || types.includes('timestamp_anomaly') || types.includes('risky_supplier')) {
+    return 'medium';
+  }
+
+  return 'low';
 }

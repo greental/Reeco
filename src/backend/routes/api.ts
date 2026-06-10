@@ -139,6 +139,15 @@ apiRouter.get('/orders/stats', async (_req, res) => {
   }
 });
 
+apiRouter.get('/orders/anomalies', async (_req, res) => {
+  try {
+    const anomalies = await ordersRepository.getAnomalies();
+    res.json({ data: anomalies });
+  } catch (error) {
+    sendError(res, 500, getErrorMessage(error), 'INTERNAL_ERROR');
+  }
+});
+
 apiRouter.get('/orders/:id', async (req, res) => {
   try {
     const order = await ordersRepository.getById(req.params.id);
