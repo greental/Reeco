@@ -11,6 +11,7 @@ const state = {
   sort: 'created_at',
   order: 'desc',
   selectedOrderId: null,
+  selectedSupplierId: null,
   events: [],
 };
 
@@ -77,8 +78,19 @@ function renderStats(stats, anomalies) {
     .join('');
 
   $('topSuppliers').innerHTML = stats.top_suppliers
-    .map((supplier) => `<li><strong>${escapeHtml(supplier.supplier_name)}</strong><br><span class="muted">${escapeHtml(supplier.supplier_id)} · ${currency.format(supplier.total_revenue)}</span></li>`)
+    .map((supplier) => `
+      <li>
+        <button class="supplier-button" type="button" data-supplier-id="${escapeHtml(supplier.supplier_id)}">
+          <strong>${escapeHtml(supplier.supplier_name)}</strong><br>
+          <span class="muted">${escapeHtml(supplier.supplier_id)} · ${currency.format(supplier.total_revenue)}</span>
+        </button>
+      </li>
+    `)
     .join('');
+}
+
+function percent(value) {
+  return `${(Number(value) * 100).toFixed(1)}%`;
 }
 
 function ordersQuery() {
@@ -188,6 +200,62 @@ async function updateSelectedOrder(event) {
   }
 }
 
+async function selectSupplier(supplierId) {
+  state.selectedSupplierId = supplierId;
+  $('supplierDetail').className = 'detail-empty';
+  $('supplierDetail').textContent = `Loading ${supplierId}…`;
+
+  try {
+    const [supplier, performance, orders] = await Promise.all([
+      getJson(`/api/suppliers/${encodeURIComponent(supplierId)}`),
+      getJson(`/api/suppliers/${encodeURIComponent(supplierId)}/performance`),
+      getJson(`/api/orders?supplier_id=${encodeURIComponent(supplierId)}&limit=10&sort=created_at&order=desc`),
+    ]);
+    renderSupplierDetail(supplier, performance, orders.data);
+  } catch (error) {
+    showError(error);
+    $('supplierDetail').className = 'detail-empty';
+    $('supplierDetail').textContent = 'Supplier details could not be loaded.';
+  }
+}
+
+function renderSupplierDetail(supplier, performance, orders) {
+  $('supplierDetail').className = '';
+  $('supplierDetail').innerHTML = `
+    <div class="detail-list">
+      <div class="detail-row"><span>Supplier</span><strong>${escapeHtml(supplier.name)}</strong></div>
+      <div class="detail-row"><span>ID</span><span>${escapeHtml(supplier.id)}</span></div>
+      <div class="detail-row"><span>Email</span><span>${escapeHtml(supplier.email || '—')}</span></div>
+      <div class="detail-row"><span>Country</span><span>${escapeHtml(supplier.country || '—')}</span></div>
+      <div class="detail-row"><span>Status</span><span>${supplier.active ? 'Active' : 'Inactive'} · rating ${escapeHtml(supplier.rating || '—')}</span></div>
+      <div class="detail-row"><span>Revenue</span><span>${currency.format(Number(supplier.total_revenue || 0))} across ${number.format(Number(supplier.order_count || 0))} orders</span></div>
+    </div>
+    <div class="metric-grid" aria-label="Supplier performance metrics">
+      <div class="metric"><span>Avg delivery</span><strong>${Number(performance.avg_delivery_days).toFixed(1)} days</strong></div>
+      <div class="metric"><span>Rejection rate</span><strong>${percent(performance.rejection_rate)}</strong></div>
+      <div class="metric"><span>Avg order</span><strong>${currency.format(performance.avg_order_value)}</strong></div>
+      <div class="metric"><span>Price consistency</span><strong>${percent(performance.price_consistency)}</strong></div>
+    </div>
+    <h3>Recent supplier orders</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Order</th><th>Status</th><th>Priority</th><th>Total</th><th>Created</th></tr></thead>
+        <tbody>
+          ${orders.map((order) => `
+            <tr data-order-id="${escapeHtml(order.id)}">
+              <td><strong>${escapeHtml(order.id)}</strong></td>
+              <td><span class="pill ${escapeHtml(order.status)}">${escapeHtml(order.status)}</span></td>
+              <td>${escapeHtml(order.priority)}</td>
+              <td>${currency.format(order.total_price)}</td>
+              <td>${date.format(new Date(order.created_at))}</td>
+            </tr>
+          `).join('') || '<tr><td colspan="5" class="muted">No recent orders found.</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 async function loadDashboard() {
   clearError();
   try {
@@ -215,6 +283,10 @@ $('filtersForm').addEventListener('submit', (event) => {
 });
 
 $('refreshButton').addEventListener('click', loadDashboard);
+$('topSuppliers').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-supplier-id]');
+  if (button) selectSupplier(button.dataset.supplierId);
+});
 $('clearFiltersButton').addEventListener('click', () => {
   $('filtersForm').reset();
   state.filters = {};
@@ -247,6 +319,10 @@ $('nextPageButton').addEventListener('click', () => {
   }
 });
 $('ordersBody').addEventListener('click', (event) => {
+  const row = event.target.closest('tr[data-order-id]');
+  if (row) selectOrder(row.dataset.orderId);
+});
+$('supplierDetail').addEventListener('click', (event) => {
   const row = event.target.closest('tr[data-order-id]');
   if (row) selectOrder(row.dataset.orderId);
 });

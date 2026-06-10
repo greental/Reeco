@@ -75,4 +75,5 @@ Root wrapper scripts should be added in a later setup slice so agents can run th
 - Backend API slices are implemented through CRUD, filtering, aggregations, anomaly detection, bulk operations, concurrency controls, and realtime events.
 - CSV import was optimized to use bulk loading instead of row-by-row inserts, keeping the full test suite practical to rerun.
 - Latest verified full-suite command: `npm run build && npm run server:smoke && npm test`.
-- Next recommended slice: frontend dashboard/order-management UI, with final packaging/docs polish after the UI is usable.
+- Frontend now includes the dashboard shell, order table filtering/sorting/pagination, order detail updates, and realtime event feedback.
+- Next recommended slice: supplier detail UI, then bulk action UX, then final packaging/docs polish.
