@@ -140,3 +140,9 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: b10f24e
 
+## 2026-06-10T16:35:58Z - add order update interactions
+
+- Test command: `npm run build && UI root/app smoke && PATCH /api/orders/:id smoke`
+- Test result: passed
+- Commit hash: d2c836c
+
