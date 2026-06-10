@@ -152,3 +152,9 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: 255ba05
 
+## 2026-06-10T17:23:13Z - add supplier detail ui
+
+- Test command: `npm run build && Supplier detail UI smoke && supplier performance API smoke`
+- Test result: passed
+- Commit hash: 1871fbd
+
