@@ -146,3 +146,9 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: d2c836c
 
+## 2026-06-10T17:07:48Z - add orders table pagination controls
+
+- Test command: `npm run build && UI controls smoke && orders pagination API smoke`
+- Test result: passed
+- Commit hash: 255ba05
+
