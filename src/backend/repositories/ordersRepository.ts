@@ -65,6 +65,46 @@ interface CountRow {
   total: string;
 }
 
+interface OrdersStatsSummaryRow {
+  total_orders: string;
+  total_revenue: string;
+  avg_order_value: string;
+}
+
+interface OrdersStatsByStatusRow {
+  status: OrderStatus;
+  count: string;
+  total_value: string;
+}
+
+interface OrdersStatsByMonthRow {
+  month: string;
+  order_count: string;
+  revenue: string;
+}
+
+interface OrdersStatsTopSupplierRow {
+  supplier_id: string;
+  supplier_name: string;
+  total_revenue: string;
+}
+
+interface OrdersStatsByWarehouseRow {
+  warehouse: string;
+  count: string;
+  total_value: string;
+}
+
+export interface OrdersStats {
+  total_orders: number;
+  total_revenue: number;
+  avg_order_value: number;
+  by_status: Record<string, { count: number; total_value: number }>;
+  by_month: Array<{ month: string; order_count: number; revenue: number }>;
+  top_suppliers: Array<{ supplier_id: string; supplier_name: string; total_revenue: number }>;
+  by_warehouse: Array<{ warehouse: string; count: number; total_value: number }>;
+}
+
 export interface OrderPatch {
   status?: OrderStatus;
   priority?: OrderPriority;
@@ -187,6 +227,84 @@ export class OrdersRepository extends BaseRepository {
       `,
       [id],
     );
+  }
+
+  async getStats(): Promise<OrdersStats> {
+    const [summary, byStatus, byMonth, topSuppliers, byWarehouse] = await Promise.all([
+      this.one<OrdersStatsSummaryRow>(
+        `
+          SELECT COUNT(*) AS total_orders,
+                 COALESCE(SUM(total_price), 0)::text AS total_revenue,
+                 COALESCE(AVG(total_price), 0)::text AS avg_order_value
+          FROM orders
+        `,
+      ),
+      this.rows<OrdersStatsByStatusRow>(
+        `
+          SELECT status,
+                 COUNT(*) AS count,
+                 COALESCE(SUM(total_price), 0)::text AS total_value
+          FROM orders
+          GROUP BY status
+        `,
+      ),
+      this.rows<OrdersStatsByMonthRow>(
+        `
+          SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
+                 COUNT(*) AS order_count,
+                 COALESCE(SUM(total_price), 0)::text AS revenue
+          FROM orders
+          GROUP BY date_trunc('month', created_at)
+          ORDER BY date_trunc('month', created_at)
+        `,
+      ),
+      this.rows<OrdersStatsTopSupplierRow>(
+        `
+          SELECT s.id AS supplier_id,
+                 s.name AS supplier_name,
+                 COALESCE(SUM(o.total_price), 0)::text AS total_revenue
+          FROM orders o
+          JOIN suppliers s ON s.id = o.supplier_id
+          GROUP BY s.id, s.name
+          ORDER BY SUM(o.total_price) DESC, s.id ASC
+          LIMIT 10
+        `,
+      ),
+      this.rows<OrdersStatsByWarehouseRow>(
+        `
+          SELECT COALESCE(NULLIF(warehouse, ''), 'unassigned') AS warehouse,
+                 COUNT(*) AS count,
+                 COALESCE(SUM(total_price), 0)::text AS total_value
+          FROM orders
+          GROUP BY COALESCE(NULLIF(warehouse, ''), 'unassigned')
+          ORDER BY warehouse
+        `,
+      ),
+    ]);
+
+    return {
+      total_orders: Number(summary?.total_orders ?? 0),
+      total_revenue: Number(summary?.total_revenue ?? 0),
+      avg_order_value: Number(summary?.avg_order_value ?? 0),
+      by_status: Object.fromEntries(
+        byStatus.map((row) => [row.status, { count: Number(row.count), total_value: Number(row.total_value) }]),
+      ),
+      by_month: byMonth.map((row) => ({
+        month: row.month,
+        order_count: Number(row.order_count),
+        revenue: Number(row.revenue),
+      })),
+      top_suppliers: topSuppliers.map((row) => ({
+        supplier_id: row.supplier_id,
+        supplier_name: row.supplier_name,
+        total_revenue: Number(row.total_revenue),
+      })),
+      by_warehouse: byWarehouse.map((row) => ({
+        warehouse: row.warehouse,
+        count: Number(row.count),
+        total_value: Number(row.total_value),
+      })),
+    };
   }
 
   async getStatus(id: string): Promise<{ status: OrderStatus } | null> {

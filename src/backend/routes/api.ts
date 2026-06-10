@@ -130,6 +130,15 @@ apiRouter.get('/orders', async (req, res) => {
   }
 });
 
+apiRouter.get('/orders/stats', async (_req, res) => {
+  try {
+    const stats = await ordersRepository.getStats();
+    res.json(stats);
+  } catch (error) {
+    sendError(res, 500, getErrorMessage(error), 'INTERNAL_ERROR');
+  }
+});
+
 apiRouter.get('/orders/:id', async (req, res) => {
   try {
     const order = await ordersRepository.getById(req.params.id);
@@ -188,6 +197,20 @@ apiRouter.get('/suppliers', async (req, res) => {
     const pagination = getPagination(req.query);
     const result = await suppliersRepository.list(pagination);
     res.json({ ...result, ...pagination });
+  } catch (error) {
+    sendError(res, 500, getErrorMessage(error), 'INTERNAL_ERROR');
+  }
+});
+
+apiRouter.get('/suppliers/:id/performance', async (req, res) => {
+  try {
+    const performance = await suppliersRepository.getPerformance(req.params.id);
+    if (!performance) {
+      sendError(res, 404, 'Supplier not found', 'SUPPLIER_NOT_FOUND');
+      return;
+    }
+
+    res.json(performance);
   } catch (error) {
     sendError(res, 500, getErrorMessage(error), 'INTERNAL_ERROR');
   }
