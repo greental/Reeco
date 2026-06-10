@@ -60,6 +60,7 @@
             <h2>Orders</h2>
             <p>Filter by status, priority, supplier, warehouse, or product search.</p>
           </div>
+          <div id="realtimeStatus" class="realtime-status">Connecting to live events…</div>
         </div>
         <form id="filtersForm" class="filters">
           <label>
@@ -117,6 +118,26 @@
           </table>
         </div>
         <p id="ordersMeta" class="muted"></p>
+      </section>
+
+      <section class="grid two-column detail-grid">
+        <article class="panel">
+          <div class="panel-header">
+            <h2>Order detail</h2>
+            <p>Select an order from the table to inspect and update status or priority.</p>
+          </div>
+          <div id="orderDetail" class="detail-empty">No order selected yet.</div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <h2>Realtime activity</h2>
+            <p>Server-sent events from order updates and bulk jobs.</p>
+          </div>
+          <ul id="eventFeed" class="event-feed">
+            <li class="muted">Waiting for live events…</li>
+          </ul>
+        </article>
       </section>
     </main>
 

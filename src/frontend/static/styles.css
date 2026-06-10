@@ -8,6 +8,7 @@
   --brand: #166534;
   --brand-dark: #14532d;
   --danger: #b91c1c;
+  --warn: #b45309;
 }
 
 * { box-sizing: border-box; }
@@ -66,6 +67,9 @@ h2 { margin-bottom: 4px; }
   padding: 12px 18px;
 }
 .button:hover { background: var(--brand-dark); }
+.button.secondary { background: #e5e7eb; color: var(--text); }
+.button.secondary:hover { background: #d1d5db; }
+.button:disabled { cursor: wait; opacity: 0.65; }
 
 .cards,
 .grid {
@@ -116,6 +120,9 @@ th, td {
   white-space: nowrap;
 }
 th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: #f8fafc; }
+tbody tr.selected { background: #ecfdf5; }
 
 .pill {
   border-radius: 999px;
@@ -136,6 +143,18 @@ th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; }
 .supplier-list { margin-bottom: 0; padding-left: 22px; }
 .supplier-list li { margin: 10px 0; }
 .error { background: #fee2e2; border: 1px solid #fecaca; border-radius: 14px; color: var(--danger); margin-top: 16px; padding: 14px 16px; }
+.success { background: #dcfce7; border: 1px solid #bbf7d0; border-radius: 14px; color: var(--brand); margin-top: 12px; padding: 12px 14px; }
+.realtime-status { color: var(--warn); font-size: 0.9rem; font-weight: 800; }
+.realtime-status.connected { color: var(--brand); }
+.detail-grid { align-items: start; }
+.detail-empty { color: var(--muted); padding: 16px 0; }
+.detail-list { display: grid; gap: 10px; margin: 16px 0; }
+.detail-row { display: grid; grid-template-columns: 130px 1fr; gap: 12px; }
+.detail-row span:first-child { color: var(--muted); font-weight: 800; }
+.update-form { border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; padding-top: 16px; align-items: end; }
+.event-feed { display: grid; gap: 10px; list-style: none; margin: 16px 0 0; padding: 0; }
+.event-feed li { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.event-feed time { color: var(--muted); display: block; font-size: 0.78rem; margin-top: 4px; }
 
 @media (max-width: 900px) {
   .cards, .two-column { grid-template-columns: 1fr; }
