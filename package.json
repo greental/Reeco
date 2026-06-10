@@ -20,9 +20,11 @@
     "test": "bash tools/run-tests.sh all",
     "test:check": "bash tools/run-tests.sh check",
     "data:inspect": "python tools/inspect_data.py",
-    "db:migrate": "tsx src/backend/db/migrate.ts"
+    "db:migrate": "tsx src/backend/db/migrate.ts",
+    "data:import": "tsx src/backend/db/import.ts"
   },
   "dependencies": {
+    "csv-parse": "^6.2.1",
     "express": "^4.19.2",
     "pg": "^8.21.0",
     "react": "^18.3.1",
