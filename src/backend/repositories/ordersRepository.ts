@@ -382,31 +382,45 @@ export class OrdersRepository extends BaseRepository {
 
   async patch(id: string, patch: OrderPatch): Promise<OrderDetailRow | null> {
     const assignments: string[] = [];
-    const params: unknown[] = [];
+    const guards: string[] = [`id = $1`, `status <> 'cancelled'`];
+    const params: unknown[] = [id];
 
     if (patch.status !== undefined) {
+      guards.push(`status <> $${params.length + 1}`);
       params.push(patch.status);
-      assignments.push(`status = $${params.length}`);
     }
 
     if (patch.priority !== undefined) {
+      guards.push(`priority <> $${params.length + 1}`);
       params.push(patch.priority);
-      assignments.push(`priority = $${params.length}`);
+    }
+
+    const updateParams: unknown[] = [];
+
+    if (patch.status !== undefined) {
+      updateParams.push(patch.status);
+      assignments.push(`status = $${updateParams.length}`);
+    }
+
+    if (patch.priority !== undefined) {
+      updateParams.push(patch.priority);
+      assignments.push(`priority = $${updateParams.length}`);
     }
 
     if (assignments.length === 0) {
       return this.getById(id);
     }
 
-    params.push(id);
-    const idParam = params.length;
+    const whereOffset = updateParams.length;
+    const shiftedGuards = guards.map((guard) => guard.replace(/\$(\d+)/g, (_match, index: string) => `$${Number(index) + whereOffset}`));
+    const allParams = [...updateParams, ...params];
 
     return this.one<OrderDetailRow>(
       `
         WITH updated AS (
           UPDATE orders
           SET ${assignments.join(', ')}, updated_at = now(), version = version + 1
-          WHERE id = $${idParam} AND status <> 'cancelled'
+          WHERE ${shiftedGuards.join(' AND ')}
           RETURNING id, supplier_id, product_id, quantity, unit_price, total_price,
                     status, priority, created_at, updated_at, warehouse, notes, version
         )
@@ -415,7 +429,7 @@ export class OrdersRepository extends BaseRepository {
         JOIN suppliers s ON s.id = u.supplier_id
         JOIN products p ON p.id = u.product_id
       `,
-      params,
+      allParams,
     );
   }
 }
