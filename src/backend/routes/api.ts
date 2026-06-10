@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import { sendError } from '../http/responses.js';
 import {
+  BULK_ACTIONS,
+  JobsRepository,
   ORDER_PRIORITIES,
   ORDER_STATUSES,
   OrdersRepository,
   ProductsRepository,
   SuppliersRepository,
+  type BulkAction,
   type OrderPatch,
   type OrderFilters,
   type OrderPriority,
@@ -22,6 +25,7 @@ const MAX_LIMIT = 1000;
 const ordersRepository = new OrdersRepository();
 const suppliersRepository = new SuppliersRepository();
 const productsRepository = new ProductsRepository();
+const jobsRepository = new JobsRepository();
 
 const ORDER_SORT_FIELDS = new Set<OrderSortField>([
   'id',
@@ -60,6 +64,10 @@ function isOrderStatus(value: unknown): value is OrderStatus {
 
 function isOrderPriority(value: unknown): value is OrderPriority {
   return typeof value === 'string' && ORDER_PRIORITIES.includes(value as OrderPriority);
+}
+
+function isBulkAction(value: unknown): value is BulkAction {
+  return typeof value === 'string' && BULK_ACTIONS.includes(value as BulkAction);
 }
 
 function asOptionalString(value: unknown): string | undefined {
@@ -108,6 +116,14 @@ function getOrderFilters(query: Record<string, unknown>): OrderFilters | null {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unexpected server error';
+}
+
+function getBulkOrderIds(body: Record<string, unknown>): string[] | null {
+  const value = body.orderIds ?? body.order_ids;
+  if (!Array.isArray(value) || value.some((id) => typeof id !== 'string')) {
+    return null;
+  }
+  return value;
 }
 
 apiRouter.get('/health', (_req, res) => {
@@ -196,6 +212,48 @@ apiRouter.patch('/orders/:id', async (req, res) => {
     }
 
     sendError(res, 409, 'Cancelled orders cannot be updated', 'ORDER_CANCELLED');
+  } catch (error) {
+    sendError(res, 500, getErrorMessage(error), 'INTERNAL_ERROR');
+  }
+});
+
+async function handleBulkAction(req: Parameters<Parameters<typeof apiRouter.post>[1]>[0], res: Parameters<Parameters<typeof apiRouter.post>[1]>[1]) {
+  try {
+    const body = req.body as Record<string, unknown>;
+    const orderIds = getBulkOrderIds(body);
+    if (!orderIds || orderIds.length === 0 || orderIds.length > 10_000 || !isBulkAction(body.action)) {
+      sendError(res, 400, 'Invalid bulk action request', 'INVALID_BULK_ACTION');
+      return;
+    }
+
+    const reason = typeof body.reason === 'string' ? body.reason : undefined;
+    const jobId = await jobsRepository.createBulkJob(orderIds, body.action, reason);
+    res.status(202).json({ jobId, job_id: jobId });
+  } catch (error) {
+    sendError(res, 500, getErrorMessage(error), 'INTERNAL_ERROR');
+  }
+}
+
+apiRouter.post('/orders/bulk-action', handleBulkAction);
+apiRouter.post('/orders/bulk-actions', handleBulkAction);
+apiRouter.post('/orders/bulk', handleBulkAction);
+
+apiRouter.get('/jobs/:id', async (req, res) => {
+  try {
+    const job = await jobsRepository.getJob(req.params.id);
+    if (!job) {
+      sendError(res, 404, 'Job not found', 'JOB_NOT_FOUND');
+      return;
+    }
+
+    res.json({
+      status: job.status,
+      progress: {
+        total: job.total,
+        completed: job.completed,
+        failed: job.failed,
+      },
+    });
   } catch (error) {
     sendError(res, 500, getErrorMessage(error), 'INTERNAL_ERROR');
   }
