@@ -104,6 +104,21 @@ h2 { margin-bottom: 4px; }
   padding-top: 16px;
 }
 .pagination { align-items: center; display: flex; gap: 10px; margin-left: auto; }
+.bulk-actions {
+  align-items: end;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 14px;
+}
+.bulk-status { border-radius: 14px; margin: 0 0 18px; padding: 12px 14px; }
+.bulk-status.processing { background: #fef3c7; border: 1px solid #fde68a; color: var(--warn); }
+.bulk-status.completed { background: #dcfce7; border: 1px solid #bbf7d0; color: var(--brand); }
+.bulk-status.failed { background: #fee2e2; border: 1px solid #fecaca; color: var(--danger); }
 
 label {
   color: var(--muted);
@@ -120,6 +135,7 @@ input, select {
   min-height: 42px;
   padding: 9px 11px;
 }
+input[type="checkbox"] { min-height: auto; }
 
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; }

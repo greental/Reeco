@@ -144,10 +144,30 @@
           </div>
         </div>
 
+        <form id="bulkActionForm" class="bulk-actions">
+          <strong id="selectedCount">0 selected</strong>
+          <label>
+            Bulk action
+            <select name="action">
+              <option value="approve">Approve</option>
+              <option value="reject">Reject</option>
+              <option value="flag">Flag</option>
+            </select>
+          </label>
+          <label class="grow">
+            Reason
+            <input name="reason" placeholder="Optional note for this bulk action" />
+          </label>
+          <button class="button" type="submit">Run bulk action</button>
+          <button class="button secondary" id="clearSelectionButton" type="button">Clear selection</button>
+        </form>
+        <div id="bulkStatus" class="bulk-status" hidden></div>
+
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th>Select</th>
                 <th>Order</th>
                 <th>Supplier</th>
                 <th>Product</th>

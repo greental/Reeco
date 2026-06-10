@@ -12,6 +12,8 @@ const state = {
   order: 'desc',
   selectedOrderId: null,
   selectedSupplierId: null,
+  selectedOrderIds: new Set(),
+  activeJobId: null,
   events: [],
 };
 
@@ -40,6 +42,19 @@ async function getJson(path) {
 async function patchJson(path, body) {
   const response = await fetch(path, {
     method: 'PATCH',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || `${path} failed with ${response.status}`);
+  }
+  return payload;
+}
+
+async function postJson(path, body) {
+  const response = await fetch(path, {
+    method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
@@ -112,6 +127,7 @@ function renderOrders(result) {
   $('ordersBody').innerHTML = result.data
     .map((order) => `
       <tr data-order-id="${escapeHtml(order.id)}" class="${order.id === state.selectedOrderId ? 'selected' : ''}">
+        <td><input type="checkbox" class="order-select" data-order-id="${escapeHtml(order.id)}" ${state.selectedOrderIds.has(order.id) ? 'checked' : ''} aria-label="Select ${escapeHtml(order.id)}" /></td>
         <td><strong>${escapeHtml(order.id)}</strong></td>
         <td>${escapeHtml(order.supplier_id)}</td>
         <td>${escapeHtml(order.product_name ?? order.product_id)}</td>
@@ -129,6 +145,11 @@ function renderOrders(result) {
   $('pageInfo').textContent = `Page ${page} of ${number.format(totalPages)}`;
   $('prevPageButton').disabled = state.offset === 0;
   $('nextPageButton').disabled = state.offset + state.limit >= state.ordersTotal;
+  renderSelectedCount();
+}
+
+function renderSelectedCount() {
+  $('selectedCount').textContent = `${number.format(state.selectedOrderIds.size)} selected`;
 }
 
 function optionList(values, selected) {
@@ -197,6 +218,66 @@ async function updateSelectedOrder(event) {
     showError(error);
   } finally {
     button.disabled = false;
+  }
+}
+
+function setBulkStatus(status, message) {
+  const element = $('bulkStatus');
+  element.hidden = false;
+  element.className = `bulk-status ${status}`;
+  element.textContent = message;
+}
+
+async function runBulkAction(event) {
+  event.preventDefault();
+  if (state.selectedOrderIds.size === 0) {
+    setBulkStatus('failed', 'Select at least one order before running a bulk action.');
+    return;
+  }
+
+  const form = new FormData(event.currentTarget);
+  const action = form.get('action');
+  const reason = form.get('reason');
+  const orderIds = Array.from(state.selectedOrderIds);
+  const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+
+  try {
+    const response = await postJson('/api/orders/bulk-action', { orderIds, action, reason });
+    state.activeJobId = response.jobId || response.job_id;
+    setBulkStatus('processing', `Bulk job ${state.activeJobId} queued for ${number.format(orderIds.length)} orders.`);
+    pollJob(state.activeJobId, submitButton);
+  } catch (error) {
+    submitButton.disabled = false;
+    showError(error);
+    setBulkStatus('failed', error instanceof Error ? error.message : 'Bulk action failed.');
+  }
+}
+
+async function pollJob(jobId, submitButton) {
+  try {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const job = await getJson(`/api/jobs/${encodeURIComponent(jobId)}`);
+      const progress = job.progress || { total: 0, completed: 0, failed: 0 };
+      setBulkStatus(
+        job.status,
+        `Job ${jobId}: ${job.status}. Completed ${number.format(progress.completed)} / ${number.format(progress.total)}, failed ${number.format(progress.failed)}.`,
+      );
+      if (job.status === 'completed' || job.status === 'failed') {
+        state.selectedOrderIds.clear();
+        renderSelectedCount();
+        submitButton.disabled = false;
+        loadDashboard();
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    setBulkStatus('processing', `Job ${jobId} is still processing. Use Refresh to update the table.`);
+  } catch (error) {
+    showError(error);
+    setBulkStatus('failed', error instanceof Error ? error.message : 'Could not poll bulk job.');
+  } finally {
+    submitButton.disabled = false;
   }
 }
 
@@ -318,7 +399,22 @@ $('nextPageButton').addEventListener('click', () => {
     loadDashboard();
   }
 });
+$('bulkActionForm').addEventListener('submit', runBulkAction);
+$('clearSelectionButton').addEventListener('click', () => {
+  state.selectedOrderIds.clear();
+  renderOrders({ data: state.orders, total: state.ordersTotal });
+});
 $('ordersBody').addEventListener('click', (event) => {
+  if (event.target.matches('input.order-select')) {
+    const orderId = event.target.dataset.orderId;
+    if (event.target.checked) {
+      state.selectedOrderIds.add(orderId);
+    } else {
+      state.selectedOrderIds.delete(orderId);
+    }
+    renderSelectedCount();
+    return;
+  }
   const row = event.target.closest('tr[data-order-id]');
   if (row) selectOrder(row.dataset.orderId);
 });
