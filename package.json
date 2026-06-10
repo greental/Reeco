@@ -4,6 +4,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/backend/server.ts",
     "start": "node dist/backend/server.js",
+    "stop": "bash tools/stop-server.sh",
     "test:basic": "bash tools/run-tests.sh basic",
     "test:filter": "bash tools/run-tests.sh filter",
     "test:agg": "bash tools/run-tests.sh agg",
