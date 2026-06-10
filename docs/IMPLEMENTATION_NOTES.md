@@ -69,3 +69,10 @@ Root wrapper scripts should be added in a later setup slice so agents can run th
 - Prefer PostgreSQL indexes and SQL queries first; add Redis only if tests require caching/coordination.
 - Use parameterized SQL and allowlists for dynamic query parts from the start.
 - Add repeatable DB migration/import/reset commands before relying on test results, because tests mutate order state.
+
+## Current backend status
+
+- Backend API slices are implemented through CRUD, filtering, aggregations, anomaly detection, bulk operations, concurrency controls, and realtime events.
+- CSV import was optimized to use bulk loading instead of row-by-row inserts, keeping the full test suite practical to rerun.
+- Latest verified full-suite command: `npm run build && npm run server:smoke && npm test`.
+- Next recommended slice: frontend dashboard/order-management UI, with final packaging/docs polish after the UI is usable.

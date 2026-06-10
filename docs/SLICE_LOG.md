@@ -80,3 +80,51 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: afd0b34
 
+## 2026-06-10T10:14:51Z - implement basic crud and filtering api
+
+- Test command: `npm run build && npm run server:smoke && npm run test:basic && npm run test:filter`
+- Test result: passed
+- Commit hash: 9741d7b
+
+## 2026-06-10T10:20:14Z - implement aggregation endpoints
+
+- Test command: `npm run build && npm run server:smoke && npm run test:agg`
+- Test result: passed
+- Commit hash: 717c095
+
+## 2026-06-10T10:25:05Z - implement anomaly detection
+
+- Test command: `npm run build && npm run server:smoke && npm run test:anomaly`
+- Test result: passed
+- Commit hash: 3a6f402
+
+## 2026-06-10T10:31:19Z - implement bulk operations
+
+- Test command: `npm run build && npm run server:smoke && npm run test:bulk`
+- Test result: passed
+- Commit hash: 1fdbc25
+
+## 2026-06-10T10:39:17Z - implement concurrency controls
+
+- Test command: `npm run build && npm run server:smoke && npm run test:concurrent`
+- Test result: passed
+- Commit hash: ef988df
+
+## 2026-06-10T10:50:27Z - implement realtime events
+
+- Test command: `npm run build && npm run server:smoke && npm run test:realtime`
+- Test result: passed
+- Commit hash: a15d911
+
+## 2026-06-10T12:38:45Z - verify full backend test suite
+
+- Test command: `npm run build && npm run server:smoke && npm test`
+- Test result: passed
+- Commit hash: 8e76917
+
+## 2026-06-10T13:00:38Z - optimize csv import bulk loading
+
+- Test command: `npm run build && npm run server:smoke && npm test`
+- Test result: passed
+- Commit hash: 9c50f7f
+
