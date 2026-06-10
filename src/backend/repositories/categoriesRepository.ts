@@ -1,4 +1,4 @@
-import type { DbPool } from '../db/pool.js';
+import type { Queryable } from '../db/query.js';
 
 export interface CategoryDescendantResult {
   categoryIds: string[];
@@ -6,10 +6,10 @@ export interface CategoryDescendantResult {
 }
 
 export async function getCategoryAndDescendantIds(
-  pool: DbPool,
+  db: Queryable,
   categoryId: string,
 ): Promise<CategoryDescendantResult> {
-  const result = await pool.query<{ id: string; cycle: boolean }>(
+  const result = await db.query<{ id: string; cycle: boolean }>(
     `
       WITH RECURSIVE descendants(id, path, cycle) AS (
         SELECT id, ARRAY[id], false
