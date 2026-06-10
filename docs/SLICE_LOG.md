@@ -62,3 +62,9 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: d5e9842
 
+## 2026-06-10T09:36:17Z - implement csv import pipeline
+
+- Test command: `npm run build && npm run db:migrate && npm run data:import`
+- Test result: passed
+- Commit hash: b8e287d
+
