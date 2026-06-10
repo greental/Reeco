@@ -158,3 +158,9 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: 1871fbd
 
+## 2026-06-10T17:30:32Z - add bulk action ux
+
+- Test command: `npm run build && Bulk action UI smoke && POST bulk action/job polling smoke`
+- Test result: passed
+- Commit hash: c79d0ab
+
