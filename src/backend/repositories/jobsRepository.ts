@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getPool, type Queryable } from '../db/query.js';
+import { publishEvent } from '../realtime/events.js';
 import { BaseRepository } from './baseRepository.js';
 
 export const BULK_ACTIONS = ['approve', 'reject', 'flag'] as const;
@@ -179,6 +180,8 @@ export class JobsRepository extends BaseRepository {
       );
 
       await client.query('COMMIT');
+
+      publishEvent({ type: 'bulk_completed', data: { jobId } });
     } catch (error) {
       await client.query('ROLLBACK');
       await pool.query(`UPDATE jobs SET status = 'failed', updated_at = now(), completed_at = now() WHERE id = $1`, [jobId]);

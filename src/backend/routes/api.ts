@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { sendError } from '../http/responses.js';
+import { addEventsClient, publishEvent } from '../realtime/events.js';
 import {
   BULK_ACTIONS,
   JobsRepository,
@@ -130,6 +131,19 @@ apiRouter.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
+apiRouter.get('/events', (req, res) => {
+  const supplierId = typeof req.query.supplier_id === 'string' ? req.query.supplier_id : undefined;
+
+  res.status(200);
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const removeClient = addEventsClient(res, supplierId);
+  req.on('close', removeClient);
+});
+
 apiRouter.get('/orders', async (req, res) => {
   try {
     const pagination = getPagination(req.query);
@@ -199,9 +213,22 @@ apiRouter.patch('/orders/:id', async (req, res) => {
       patch.priority = body.priority;
     }
 
+    const before = patch.status ? await ordersRepository.getById(req.params.id) : null;
     const updated = await ordersRepository.patch(req.params.id, patch);
     if (updated) {
       res.json(updated);
+      if (patch.status && before && before.status !== updated.status) {
+        publishEvent({
+          type: 'order_updated',
+          data: {
+            id: updated.id,
+            supplier_id: updated.supplier_id,
+            old_status: before.status,
+            new_status: updated.status,
+            updated_at: updated.updated_at,
+          },
+        });
+      }
       return;
     }
 
