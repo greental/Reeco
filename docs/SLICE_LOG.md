@@ -134,3 +134,9 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: 3843ec6
 
+## 2026-06-10T16:28:28Z - add server stop command
+
+- Test command: `bash -n tools/stop-server.sh && npm run build && npm run stop + stop smoke`
+- Test result: passed
+- Commit hash: b10f24e
+
