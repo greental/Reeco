@@ -70,7 +70,7 @@ function parseBoolean(value: string): boolean {
   return value.trim().toLowerCase() === 'true';
 }
 
-async function streamCsv<T extends Record<string, string>>(
+async function streamCsv<T extends object>(
   fileName: string,
   onRow: (row: T) => Promise<void>,
 ): Promise<number> {
@@ -128,7 +128,7 @@ async function bulkInsert(
   await client.query(sql, values);
 }
 
-async function importCsvInBatches<T extends Record<string, string>>(
+async function importCsvInBatches<T extends object>(
   client: DbClient,
   fileName: string,
   tableName: TableName,
@@ -185,8 +185,6 @@ async function importCategories(client: DbClient): Promise<number> {
       parentUpdates.push({ id: row.id, parentId });
     }
 
-    // Insert first with NULL parent_id, then update valid parent links after all
-    // categories exist. This avoids ordering issues in hierarchical data.
     batch.push([row.id, row.name, null]);
 
     if (batch.length >= DEFAULT_BATCH_SIZE) {
@@ -212,6 +210,7 @@ async function updateCategoryParents(
 ): Promise<void> {
   for (let offset = 0; offset < updates.length; offset += batchSize) {
     const chunk = updates.slice(offset, offset + batchSize);
+
     if (chunk.length === 0) {
       continue;
     }
@@ -307,6 +306,8 @@ async function validateCounts(client: DbClient, expectedCounts: ImportCounts): P
 }
 
 export async function importData(): Promise<void> {
+  const importStartedAt = Date.now();
+
   const pool = createPool();
   const client = await pool.connect();
 
@@ -328,7 +329,13 @@ export async function importData(): Promise<void> {
 
     await client.query('COMMIT');
 
+    
+
     console.log('CSV import complete.');
+    const importFinishedAt = Date.now();
+    console.log(
+      `import duration=${((importFinishedAt - importStartedAt) / 1000).toFixed(2)}s`,
+    );
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
