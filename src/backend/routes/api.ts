@@ -232,7 +232,7 @@ apiRouter.patch('/orders/:id', async (req, res) => {
       return;
     }
 
-    const existing = await ordersRepository.getStatus(req.params.id);
+    const existing = await ordersRepository.getById(req.params.id);
     if (!existing) {
       sendError(res, 404, 'Order not found', 'ORDER_NOT_FOUND');
       return;

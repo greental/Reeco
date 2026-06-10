@@ -38,10 +38,13 @@ export class JobsRepository extends BaseRepository {
   async createBulkJob(orderIds: string[], action: BulkAction, reason?: string): Promise<string> {
     const jobId = `job_${randomUUID()}`;
     const uniqueOrderIds = [...new Set(orderIds)];
+    const pool = getPool();
+    const client = await pool.connect();
 
-    await this.db.query('BEGIN');
     try {
-      await this.db.query(
+      await client.query('BEGIN');
+
+      await client.query(
         `
           INSERT INTO jobs (id, status, action, reason, total, completed, failed)
           VALUES ($1, 'processing', $2, $3, $4, 0, 0)
@@ -49,7 +52,7 @@ export class JobsRepository extends BaseRepository {
         [jobId, action, reason ?? null, uniqueOrderIds.length],
       );
 
-      await this.db.query(
+      await client.query(
         `
           INSERT INTO job_items (job_id, order_id, status)
           SELECT $1, unnest($2::text[]), 'pending'
@@ -58,10 +61,12 @@ export class JobsRepository extends BaseRepository {
         [jobId, uniqueOrderIds],
       );
 
-      await this.db.query('COMMIT');
+      await client.query('COMMIT');
     } catch (error) {
-      await this.db.query('ROLLBACK');
+      await client.query('ROLLBACK');
       throw error;
+    } finally {
+      client.release();
     }
 
     setImmediate(() => {

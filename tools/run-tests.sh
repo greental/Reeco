@@ -15,7 +15,11 @@ fi
 
 case "$SUITE" in
   all)
-    npm --prefix tests test
+    for ordered_suite in basic filter agg anomaly bulk concurrent perf realtime security; do
+      echo "Running ordered suite: $ordered_suite"
+      npm run data:import
+      npm --prefix tests run "test:$ordered_suite"
+    done
     ;;
   basic|filter|agg|anomaly|bulk|concurrent|perf|realtime|security)
     npm --prefix tests run "test:$SUITE"

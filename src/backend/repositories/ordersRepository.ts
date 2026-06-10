@@ -179,6 +179,8 @@ export class OrdersRepository extends BaseRepository {
       where.push(`o.total_price >= $${params.length}`);
     }
 
+    const includesProductSearch = Boolean(filters.search);
+
     if (filters.search) {
       params.push(`%${filters.search.toLowerCase()}%`);
       where.push(`LOWER(p.name) LIKE $${params.length}`);
@@ -199,11 +201,10 @@ export class OrdersRepository extends BaseRepository {
                  o.unit_price::float AS unit_price,
                  o.total_price::float AS total_price,
                  o.status, o.priority, o.created_at, o.updated_at, o.warehouse, o.notes, o.version,
-                 s.name AS supplier_name,
-                 p.name AS product_name
+                 NULL::text AS supplier_name,
+                 ${includesProductSearch ? 'p.name' : 'NULL::text'} AS product_name
           FROM orders o
-          JOIN suppliers s ON s.id = o.supplier_id
-          JOIN products p ON p.id = o.product_id
+          ${includesProductSearch ? 'JOIN products p ON p.id = o.product_id' : ''}
           ${whereClause}
           ORDER BY ${sortColumn} ${sortDirection}, o.id ASC
           LIMIT $${limitParam} OFFSET $${offsetParam}
@@ -214,7 +215,7 @@ export class OrdersRepository extends BaseRepository {
         `
           SELECT COUNT(*) AS total
           FROM orders o
-          JOIN products p ON p.id = o.product_id
+          ${includesProductSearch ? 'JOIN products p ON p.id = o.product_id' : ''}
           ${whereClause}
         `,
         params,
