@@ -128,3 +128,9 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: 9c50f7f
 
+## 2026-06-10T16:19:10Z - implement frontend dashboard shell
+
+- Test command: `npm run build && PORT=3001 node dist/backend/server.js + UI smoke`
+- Test result: passed
+- Commit hash: 3843ec6
+
