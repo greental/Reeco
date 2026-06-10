@@ -6,6 +6,10 @@ const state = {
   filters: {},
   orders: [],
   ordersTotal: 0,
+  limit: 25,
+  offset: 0,
+  sort: 'created_at',
+  order: 'desc',
   selectedOrderId: null,
   events: [],
 };
@@ -78,7 +82,12 @@ function renderStats(stats, anomalies) {
 }
 
 function ordersQuery() {
-  const params = new URLSearchParams({ limit: '25', sort: 'created_at', order: 'desc' });
+  const params = new URLSearchParams({
+    limit: String(state.limit),
+    offset: String(state.offset),
+    sort: state.sort,
+    order: state.order,
+  });
   for (const [key, value] of Object.entries(state.filters)) {
     if (value) params.set(key, value);
   }
@@ -103,6 +112,11 @@ function renderOrders(result) {
     `)
     .join('');
   $('ordersMeta').textContent = `Showing ${result.data.length} of ${number.format(state.ordersTotal)} matching orders.`;
+  const page = Math.floor(state.offset / state.limit) + 1;
+  const totalPages = Math.max(1, Math.ceil(state.ordersTotal / state.limit));
+  $('pageInfo').textContent = `Page ${page} of ${number.format(totalPages)}`;
+  $('prevPageButton').disabled = state.offset === 0;
+  $('nextPageButton').disabled = state.offset + state.limit >= state.ordersTotal;
 }
 
 function optionList(values, selected) {
@@ -196,10 +210,42 @@ async function loadDashboard() {
 $('filtersForm').addEventListener('submit', (event) => {
   event.preventDefault();
   state.filters = Object.fromEntries(new FormData(event.currentTarget).entries());
+  state.offset = 0;
   loadDashboard();
 });
 
 $('refreshButton').addEventListener('click', loadDashboard);
+$('clearFiltersButton').addEventListener('click', () => {
+  $('filtersForm').reset();
+  state.filters = {};
+  state.offset = 0;
+  loadDashboard();
+});
+$('sortField').addEventListener('change', (event) => {
+  state.sort = event.target.value;
+  state.offset = 0;
+  loadDashboard();
+});
+$('sortDirection').addEventListener('change', (event) => {
+  state.order = event.target.value;
+  state.offset = 0;
+  loadDashboard();
+});
+$('pageSize').addEventListener('change', (event) => {
+  state.limit = Number(event.target.value);
+  state.offset = 0;
+  loadDashboard();
+});
+$('prevPageButton').addEventListener('click', () => {
+  state.offset = Math.max(0, state.offset - state.limit);
+  loadDashboard();
+});
+$('nextPageButton').addEventListener('click', () => {
+  if (state.offset + state.limit < state.ordersTotal) {
+    state.offset += state.limit;
+    loadDashboard();
+  }
+});
 $('ordersBody').addEventListener('click', (event) => {
   const row = event.target.closest('tr[data-order-id]');
   if (row) selectOrder(row.dataset.orderId);

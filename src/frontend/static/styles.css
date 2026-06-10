@@ -94,6 +94,16 @@ h2 { margin-bottom: 4px; }
   margin: 18px 0;
   align-items: end;
 }
+.table-controls {
+  align-items: end;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 6px 0 18px;
+  padding-top: 16px;
+}
+.pagination { align-items: center; display: flex; gap: 10px; margin-left: auto; }
 
 label {
   color: var(--muted);

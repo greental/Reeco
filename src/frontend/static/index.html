@@ -93,12 +93,56 @@
             Warehouse
             <input name="warehouse" placeholder="warehouse_east" />
           </label>
+          <label>
+            From
+            <input name="date_from" type="date" />
+          </label>
+          <label>
+            To
+            <input name="date_to" type="date" />
+          </label>
           <label class="grow">
             Product search
             <input name="search" placeholder="hydraulic" />
           </label>
           <button class="button" type="submit">Apply</button>
+          <button class="button secondary" id="clearFiltersButton" type="button">Clear</button>
         </form>
+
+        <div class="table-controls">
+          <label>
+            Sort by
+            <select id="sortField">
+              <option value="created_at">Created date</option>
+              <option value="updated_at">Updated date</option>
+              <option value="total_price">Total price</option>
+              <option value="status">Status</option>
+              <option value="priority">Priority</option>
+              <option value="warehouse">Warehouse</option>
+            </select>
+          </label>
+          <label>
+            Direction
+            <select id="sortDirection">
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+          </label>
+          <label>
+            Page size
+            <select id="pageSize">
+              <option value="10">10</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+          <div class="pagination">
+            <button class="button secondary" id="prevPageButton" type="button">Previous</button>
+            <span id="pageInfo" class="muted">Page 1</span>
+            <button class="button secondary" id="nextPageButton" type="button">Next</button>
+          </div>
+        </div>
 
         <div class="table-wrap">
           <table>
