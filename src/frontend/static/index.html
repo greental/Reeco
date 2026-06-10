@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reeco Procurement Dashboard</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Procurement operations</p>
+          <h1>Reeco Dashboard</h1>
+          <p class="lede">Monitor order health, revenue, anomalies, and supplier activity from the assignment API.</p>
+        </div>
+        <button id="refreshButton" class="button">Refresh</button>
+      </header>
+
+      <section id="errorBanner" class="error" hidden></section>
+
+      <section class="cards" aria-label="Dashboard metrics">
+        <article class="card">
+          <span>Total orders</span>
+          <strong id="totalOrders">—</strong>
+        </article>
+        <article class="card">
+          <span>Total revenue</span>
+          <strong id="totalRevenue">—</strong>
+        </article>
+        <article class="card">
+          <span>Average order</span>
+          <strong id="avgOrderValue">—</strong>
+        </article>
+        <article class="card">
+          <span>Anomalies flagged</span>
+          <strong id="anomalyCount">—</strong>
+        </article>
+      </section>
+
+      <section class="grid two-column">
+        <article class="panel">
+          <div class="panel-header">
+            <h2>Status mix</h2>
+          </div>
+          <div id="statusMix" class="status-list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <h2>Top suppliers</h2>
+          </div>
+          <ol id="topSuppliers" class="supplier-list"></ol>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header split">
+          <div>
+            <h2>Orders</h2>
+            <p>Filter by status, priority, supplier, warehouse, or product search.</p>
+          </div>
+        </div>
+        <form id="filtersForm" class="filters">
+          <label>
+            Status
+            <select name="status">
+              <option value="">Any</option>
+              <option>pending</option>
+              <option>approved</option>
+              <option>rejected</option>
+              <option>shipped</option>
+              <option>delivered</option>
+              <option>cancelled</option>
+            </select>
+          </label>
+          <label>
+            Priority
+            <select name="priority">
+              <option value="">Any</option>
+              <option>low</option>
+              <option>medium</option>
+              <option>high</option>
+              <option>critical</option>
+            </select>
+          </label>
+          <label>
+            Supplier ID
+            <input name="supplier_id" placeholder="sup_042" />
+          </label>
+          <label>
+            Warehouse
+            <input name="warehouse" placeholder="warehouse_east" />
+          </label>
+          <label class="grow">
+            Product search
+            <input name="search" placeholder="hydraulic" />
+          </label>
+          <button class="button" type="submit">Apply</button>
+        </form>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Supplier</th>
+                <th>Product</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Total</th>
+                <th>Warehouse</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody id="ordersBody"></tbody>
+          </table>
+        </div>
+        <p id="ordersMeta" class="muted"></p>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
