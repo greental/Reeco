@@ -182,3 +182,9 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: pending
 
+## 2026-06-11T06:20:41Z - implement optional redis response cache
+
+- Test command: `npm run build && npm run server:smoke && npm run test:check && npx tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --lib ES2022,DOM --strict --skipLibCheck stress-tests/api_stress.ts stress-tests/cache_stress.ts && REDIS_ENABLED=true npm run server:smoke`
+- Test result: passed
+- Commit hash: 95b3bfe
+
