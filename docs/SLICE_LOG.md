@@ -182,3 +182,9 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: 95b3bfe
 
+## 2026-06-11T06:34:23Z - harden csv import malformed row fallback
+
+- Test command: `npm run build && npm run data:import`
+- Test result: passed
+- Commit hash: ed8333d
+
