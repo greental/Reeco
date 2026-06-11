@@ -1,5 +1,109 @@
 # Senior Fullstack Engineer — Take-Home Assignment
 
+## Implemented Solution Notes
+
+This repository contains a completed Node.js/TypeScript + PostgreSQL implementation for the procurement order-management assignment.
+
+### What is included
+
+- Express REST API under `/api` for orders, suppliers, products, analytics, anomaly detection, bulk jobs, and realtime events.
+- PostgreSQL migrations and CSV import scripts for the provided `data/` files.
+- Server-Sent Events endpoint at `/api/events` for `order_updated` and `bulk_completed` notifications.
+- Static procurement dashboard served from `src/frontend/static` with filtering, sorting, pagination, order updates, supplier detail, bulk actions, and realtime activity.
+- Required qualitative-review docs:
+  - [`ARCHITECTURE.md`](./ARCHITECTURE.md)
+  - [`ANOMALY_STRATEGY.md`](./ANOMALY_STRATEGY.md)
+
+### Run locally
+
+```bash
+# Install dependencies
+npm install
+
+# Start PostgreSQL + Redis from the provided compose file
+docker-compose up -d
+
+# Create schema and load the provided CSV fixtures
+npm run db:migrate
+npm run data:import
+
+# Build and start the app on http://localhost:3000
+npm run build
+npm start
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+### Verification commands
+
+```bash
+# TypeScript build
+npm run build
+
+# Smoke-test server startup/API health
+npm run server:smoke
+
+# Run the assignment suites through root wrappers
+npm run test:basic
+npm run test:filter
+npm run test:agg
+npm run test:anomaly
+npm run test:bulk
+npm run test:concurrent
+npm run test:perf
+npm run test:realtime
+npm run test:security
+
+# Ordered full run
+npm test
+```
+
+Operational notes:
+
+- `.env.example` matches the default Docker PostgreSQL connection.
+- Tests mutate order state, so rerun `npm run data:import` when you need a clean fixture baseline.
+- `Redis` is available from `docker-compose.yml` and can be enabled as an optional LRU-style API response cache with `REDIS_ENABLED=true`.
+- The frontend is static JavaScript rather than React to reduce build complexity while still covering the requested dashboard workflows.
+
+### Optional Redis response cache
+
+Redis is already included in the provided Docker Compose stack. By default the app runs without cache for deterministic baseline behavior:
+
+```bash
+REDIS_ENABLED=false npm start
+```
+
+To enable the app-level LRU-style response cache for read-heavy endpoints:
+
+```bash
+REDIS_ENABLED=true CACHE_TTL_SECONDS=60 CACHE_MAX_ENTRIES=500 npm start
+```
+
+Cached endpoints currently include:
+
+- `GET /api/orders/stats`
+- `GET /api/orders/anomalies`
+- `GET /api/suppliers/:id/performance`
+
+Writes through order `PATCH` and completed bulk jobs invalidate the API cache namespace so subsequent reads refresh from PostgreSQL.
+
+### Project-owned stress tests
+
+The official assignment tests in `tests/` are not modified. Additional local stress checks live under `stress-tests/`:
+
+```bash
+npm run stress:api
+npm run stress:cache
+```
+
+These scripts assume the server is already running and accept `API_URL`, `STRESS_REQUESTS`, and `STRESS_CONCURRENCY` environment overrides.
+
+---
+
 Build a **procurement order-management dashboard** with a REST API backend and a React frontend.
 
 You receive a PostgreSQL database (via Docker), CSV seed data, and a comprehensive automated test suite. Your job is to import the data, implement the API, build the UI, and pass as many tests as possible.

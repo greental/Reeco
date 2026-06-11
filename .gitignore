@@ -11,3 +11,5 @@ coverage/
 tools/.env
 tools/__pycache__/
 tools/*.pyc
+.vscode/
+*.session.sql

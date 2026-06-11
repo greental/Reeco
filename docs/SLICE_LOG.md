@@ -164,3 +164,21 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: c79d0ab
 
+## 2026-06-10T17:58:00Z - add required architecture and anomaly docs
+
+- Test command: `npm run build`
+- Test result: passed
+- Commit hash: pending
+
+## 2026-06-10T18:03:00Z - add final packaging readme polish
+
+- Test command: `npm run build && npm run test:check`
+- Test result: passed
+- Commit hash: pending
+
+## 2026-06-11T06:10:00Z - implement optional redis response cache
+
+- Test command: `npm run build && npm run server:smoke && npm run test:check && npx tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --lib ES2022,DOM --strict --skipLibCheck stress-tests/api_stress.ts stress-tests/cache_stress.ts && REDIS_ENABLED=true npm run server:smoke`
+- Test result: passed
+- Commit hash: pending
+

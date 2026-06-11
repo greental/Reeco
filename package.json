@@ -24,14 +24,17 @@
     "db:migrate": "tsx src/backend/db/migrate.ts",
     "data:import": "tsx src/backend/db/import.ts",
     "data:verify:categories": "tsx tools/verify_category_lookup.ts",
-    "server:smoke": "tsx tools/smoke_server.ts"
+    "server:smoke": "tsx tools/smoke_server.ts",
+    "stress:api": "tsx stress-tests/api_stress.ts",
+    "stress:cache": "tsx stress-tests/cache_stress.ts"
   },
   "dependencies": {
     "csv-parse": "^6.2.1",
     "express": "^4.19.2",
     "pg": "^8.21.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "redis": "^4.7.1"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

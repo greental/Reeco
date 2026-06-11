@@ -12,11 +12,18 @@ export interface RedisConfig {
   enabled: boolean;
 }
 
+export interface CacheConfig {
+  ttlSeconds: number;
+  maxEntries: number;
+  namespace: string;
+}
+
 export interface AppConfig {
   port: number;
   nodeEnv: string;
   database: DatabaseConfig;
   redis: RedisConfig;
+  cache: CacheConfig;
 }
 
 const DEFAULT_PORT = 3000;
@@ -29,6 +36,9 @@ const DEFAULT_DATABASE = {
 };
 const DEFAULT_DATABASE_URL = `postgresql://${DEFAULT_DATABASE.user}:${DEFAULT_DATABASE.password}@${DEFAULT_DATABASE.host}:${DEFAULT_DATABASE.port}/${DEFAULT_DATABASE.database}`;
 const DEFAULT_REDIS_URL = 'redis://localhost:6379';
+const DEFAULT_CACHE_TTL_SECONDS = 30;
+const DEFAULT_CACHE_MAX_ENTRIES = 250;
+const DEFAULT_CACHE_NAMESPACE = 'reeco-api';
 
 function parseInteger(value: string | undefined, fallback: number): number {
   if (!value) {
@@ -64,6 +74,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     redis: {
       url: env.REDIS_URL ?? DEFAULT_REDIS_URL,
       enabled: parseBoolean(env.REDIS_ENABLED, false),
+    },
+    cache: {
+      ttlSeconds: parseInteger(env.CACHE_TTL_SECONDS, DEFAULT_CACHE_TTL_SECONDS),
+      maxEntries: parseInteger(env.CACHE_MAX_ENTRIES, DEFAULT_CACHE_MAX_ENTRIES),
+      namespace: env.CACHE_NAMESPACE ?? DEFAULT_CACHE_NAMESPACE,
     },
   };
 }

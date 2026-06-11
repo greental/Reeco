@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { invalidateApiCache } from '../cache/responseCache.js';
 import { getPool, type Queryable } from '../db/query.js';
 import { publishEvent } from '../realtime/events.js';
 import { BaseRepository } from './baseRepository.js';
@@ -186,6 +187,7 @@ export class JobsRepository extends BaseRepository {
 
       await client.query('COMMIT');
 
+      await invalidateApiCache();
       publishEvent({ type: 'bulk_completed', data: { jobId } });
     } catch (error) {
       await client.query('ROLLBACK');

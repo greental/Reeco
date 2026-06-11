@@ -19,7 +19,7 @@
   - database: `order_ops`
 - Redis 7 on `localhost:6379`
 
-Redis is available, but should be postponed until performance or coordination needs justify it.
+Redis is available and now backs an optional API response cache when `REDIS_ENABLED=true`.
 
 ## Data files verified
 
@@ -75,5 +75,9 @@ Root wrapper scripts should be added in a later setup slice so agents can run th
 - Backend API slices are implemented through CRUD, filtering, aggregations, anomaly detection, bulk operations, concurrency controls, and realtime events.
 - CSV import was optimized to use bulk loading instead of row-by-row inserts, keeping the full test suite practical to rerun.
 - Latest verified full-suite command: `npm run build && npm run server:smoke && npm test`.
-- Frontend now includes the dashboard shell, order table filtering/sorting/pagination, order detail updates, and realtime event feedback.
-- Next recommended slice: supplier detail UI, then bulk action UX, then final packaging/docs polish.
+- Frontend now includes the dashboard shell, order table filtering/sorting/pagination, order detail updates, supplier detail UI, bulk action UX, and realtime event feedback.
+- Root-level `ARCHITECTURE.md` and `ANOMALY_STRATEGY.md` document the required architecture and anomaly strategy sections for submission review.
+- Root `README.md` now includes implemented-solution notes, local run steps, and verification commands before the original assignment brief.
+- Redis response caching now covers read-heavy stats/anomalies/supplier-performance endpoints with TTL, app-level LRU-style eviction, and namespace invalidation after writes.
+- Project-owned stress tests live under `stress-tests/`; the official assignment `tests/` directory remains untouched.
+- Next recommended slice: run cache-enabled smoke/stress verification, full verification run, and final commit/package.

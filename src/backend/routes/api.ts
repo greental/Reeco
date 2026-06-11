@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { cached, invalidateApiCache, makeCacheKey } from '../cache/responseCache.js';
 import { sendError } from '../http/responses.js';
 import { addEventsClient, publishEvent } from '../realtime/events.js';
 import {
@@ -162,7 +163,7 @@ apiRouter.get('/orders', async (req, res) => {
 
 apiRouter.get('/orders/stats', async (_req, res) => {
   try {
-    const stats = await ordersRepository.getStats();
+    const stats = await cached(makeCacheKey('orders:stats'), () => ordersRepository.getStats());
     res.json(stats);
   } catch (error) {
     sendError(res, 500, getErrorMessage(error), 'INTERNAL_ERROR');
@@ -171,8 +172,10 @@ apiRouter.get('/orders/stats', async (_req, res) => {
 
 apiRouter.get('/orders/anomalies', async (_req, res) => {
   try {
-    const anomalies = await ordersRepository.getAnomalies();
-    res.json({ data: anomalies });
+    const result = await cached(makeCacheKey('orders:anomalies'), async () => ({
+      data: await ordersRepository.getAnomalies(),
+    }));
+    res.json(result);
   } catch (error) {
     sendError(res, 500, getErrorMessage(error), 'INTERNAL_ERROR');
   }
@@ -216,6 +219,7 @@ apiRouter.patch('/orders/:id', async (req, res) => {
     const before = patch.status ? await ordersRepository.getById(req.params.id) : null;
     const updated = await ordersRepository.patch(req.params.id, patch);
     if (updated) {
+      await invalidateApiCache();
       res.json(updated);
       if (patch.status && before && before.status !== updated.status) {
         publishEvent({
@@ -298,7 +302,9 @@ apiRouter.get('/suppliers', async (req, res) => {
 
 apiRouter.get('/suppliers/:id/performance', async (req, res) => {
   try {
-    const performance = await suppliersRepository.getPerformance(req.params.id);
+    const performance = await cached(makeCacheKey('suppliers:performance', { id: req.params.id }), () =>
+      suppliersRepository.getPerformance(req.params.id),
+    );
     if (!performance) {
       sendError(res, 404, 'Supplier not found', 'SUPPLIER_NOT_FOUND');
       return;
