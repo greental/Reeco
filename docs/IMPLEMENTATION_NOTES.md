@@ -80,4 +80,5 @@ Root wrapper scripts should be added in a later setup slice so agents can run th
 - Root `README.md` now includes implemented-solution notes, local run steps, and verification commands before the original assignment brief.
 - Redis response caching now covers read-heavy stats/anomalies/supplier-performance endpoints with TTL, app-level LRU-style eviction, and namespace invalidation after writes.
 - Project-owned stress tests live under `stress-tests/`; the official assignment `tests/` directory remains untouched.
+- CSV import now falls back from failed batch inserts to row-by-row insertion using savepoints, so a malformed row can be skipped with a warning instead of aborting an otherwise valid import.
 - Next recommended slice: run cache-enabled smoke/stress verification, full verification run, and final commit/package.

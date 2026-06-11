@@ -128,6 +128,52 @@ async function bulkInsert(
   await client.query(sql, values);
 }
 
+function getErrorSummary(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function insertRowsWithFallback(
+  client: DbClient,
+  tableName: TableName,
+  columns: string[],
+  rows: SqlValue[][],
+): Promise<number> {
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  await client.query('SAVEPOINT import_batch');
+  try {
+    await bulkInsert(client, tableName, columns, rows);
+    await client.query('RELEASE SAVEPOINT import_batch');
+    return rows.length;
+  } catch (error) {
+    await client.query('ROLLBACK TO SAVEPOINT import_batch');
+    await client.query('RELEASE SAVEPOINT import_batch');
+    console.warn(
+      `Bulk insert into ${tableName} failed for ${rows.length} rows; retrying row-by-row. Reason: ${getErrorSummary(error)}`,
+    );
+  }
+
+  let inserted = 0;
+  for (const [index, row] of rows.entries()) {
+    await client.query('SAVEPOINT import_row');
+    try {
+      await bulkInsert(client, tableName, columns, [row]);
+      await client.query('RELEASE SAVEPOINT import_row');
+      inserted += 1;
+    } catch (error) {
+      await client.query('ROLLBACK TO SAVEPOINT import_row');
+      await client.query('RELEASE SAVEPOINT import_row');
+      console.warn(
+        `Skipping malformed ${tableName} row in fallback position ${index + 1}/${rows.length}: ${getErrorSummary(error)}`,
+      );
+    }
+  }
+
+  return inserted;
+}
+
 async function importCsvInBatches<T extends object>(
   client: DbClient,
   fileName: string,
@@ -137,21 +183,26 @@ async function importCsvInBatches<T extends object>(
   batchSize = DEFAULT_BATCH_SIZE,
 ): Promise<number> {
   let batch: SqlValue[][] = [];
+  let inserted = 0;
 
-  const count = await streamCsv<T>(fileName, async (row) => {
+  const sourceCount = await streamCsv<T>(fileName, async (row) => {
     batch.push(mapRow(row));
 
     if (batch.length >= batchSize) {
-      await bulkInsert(client, tableName, columns, batch);
+      inserted += await insertRowsWithFallback(client, tableName, columns, batch);
       batch = [];
     }
   });
 
   if (batch.length > 0) {
-    await bulkInsert(client, tableName, columns, batch);
+    inserted += await insertRowsWithFallback(client, tableName, columns, batch);
   }
 
-  return count;
+  if (inserted !== sourceCount) {
+    console.warn(`${tableName}: inserted ${inserted}/${sourceCount}; skipped ${sourceCount - inserted} malformed rows.`);
+  }
+
+  return inserted;
 }
 
 async function importSuppliers(client: DbClient): Promise<number> {
@@ -173,13 +224,10 @@ async function importSuppliers(client: DbClient): Promise<number> {
 }
 
 async function importCategories(client: DbClient): Promise<number> {
-  const knownIds = new Set<string>();
   const parentUpdates: Array<{ id: string; parentId: string }> = [];
   let batch: SqlValue[][] = [];
 
   const count = await streamCsv<CategoryRow>('categories.csv', async (row) => {
-    knownIds.add(row.id);
-
     const parentId = emptyToNull(row.parent_id);
     if (parentId) {
       parentUpdates.push({ id: row.id, parentId });
@@ -188,19 +236,25 @@ async function importCategories(client: DbClient): Promise<number> {
     batch.push([row.id, row.name, null]);
 
     if (batch.length >= DEFAULT_BATCH_SIZE) {
-      await bulkInsert(client, 'categories', ['id', 'name', 'parent_id'], batch);
+      await insertRowsWithFallback(client, 'categories', ['id', 'name', 'parent_id'], batch);
       batch = [];
     }
   });
 
   if (batch.length > 0) {
-    await bulkInsert(client, 'categories', ['id', 'name', 'parent_id'], batch);
+    await insertRowsWithFallback(client, 'categories', ['id', 'name', 'parent_id'], batch);
   }
 
-  const validParentUpdates = parentUpdates.filter(({ parentId }) => knownIds.has(parentId));
+  const insertedCategoryRows = await client.query<{ id: string }>('SELECT id FROM categories');
+  const insertedIds = new Set(insertedCategoryRows.rows.map((row) => row.id));
+  const validParentUpdates = parentUpdates.filter(({ id, parentId }) => insertedIds.has(id) && insertedIds.has(parentId));
   await updateCategoryParents(client, validParentUpdates);
 
-  return count;
+  if (insertedIds.size !== count) {
+    console.warn(`categories: inserted ${insertedIds.size}/${count}; skipped ${count - insertedIds.size} malformed rows.`);
+  }
+
+  return insertedIds.size;
 }
 
 async function updateCategoryParents(
@@ -328,8 +382,6 @@ export async function importData(): Promise<void> {
     await validateCounts(client, counts);
 
     await client.query('COMMIT');
-
-    
 
     console.log('CSV import complete.');
     const importFinishedAt = Date.now();
