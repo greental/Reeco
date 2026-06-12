@@ -30,10 +30,9 @@ run_suite() {
 
 case "$SUITE" in
   all)
-    echo "Importing data once before ordered test suites..."
-    npm run data:import
-
     for ordered_suite in basic filter agg anomaly bulk concurrent perf realtime security; do
+      echo "Importing fresh data before ordered suite: $ordered_suite"
+      npm run data:import
       run_suite "$ordered_suite"
     done
     ;;

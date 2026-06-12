@@ -5,10 +5,13 @@ import { sendError } from './http/responses.js';
 
 export function createApp() {
   const app = express();
-  const frontendPath = path.join(process.cwd(), 'src/frontend/static');
+  const builtFrontendPath = path.join(process.cwd(), 'dist/frontend');
+  const fallbackFrontendPath = path.join(process.cwd(), 'src/frontend/static');
+  const frontendPath = process.env.NODE_ENV === 'production' ? builtFrontendPath : fallbackFrontendPath;
 
   app.use(express.json({ limit: '1mb' }));
   app.use('/api', apiRouter);
+  app.use('/assets', express.static(path.join(builtFrontendPath, 'assets')));
   app.use(express.static(frontendPath));
 
   app.get('*', (req, res, next) => {

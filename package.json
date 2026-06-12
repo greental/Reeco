@@ -1,7 +1,10 @@
 {
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "frontend:dev": "vite --host 0.0.0.0",
+    "frontend:build": "vite build",
     "dev": "tsx src/backend/server.ts",
     "start": "node dist/backend/server.js",
     "stop": "bash tools/stop-server.sh",
@@ -25,8 +28,12 @@
     "data:import": "tsx src/backend/db/import.ts",
     "data:verify:categories": "tsx tools/verify_category_lookup.ts",
     "server:smoke": "tsx tools/smoke_server.ts",
-    "stress:api": "tsx stress-tests/api_stress.ts",
-    "stress:cache": "tsx stress-tests/cache_stress.ts"
+    "stress:api": "vitest run --config stress-tests/vitest.config.ts stress-tests/api_stress.ts",
+    "stress:cache": "npm run build && vitest run --config stress-tests/vitest.config.ts stress-tests/cache_stress.ts",
+    "stress:generate-data": "python tools/generate_stress_data.py --orders 200000 --out data_stress --seed 42",
+    "stress:validate-data": "vitest run --config stress-tests/vitest.config.ts stress-tests/validate_stress_dataset.ts",
+    "stress:validate-api": "vitest run --config stress-tests/vitest.config.ts stress-tests/validate_stress_api.ts",
+    "stress:test": "vitest run --config stress-tests/vitest.config.ts"
   },
   "dependencies": {
     "csv-parse": "^6.2.1",
@@ -34,7 +41,8 @@
     "pg": "^8.21.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "redis": "^4.7.1"
+    "redis": "^4.7.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
@@ -42,7 +50,10 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.7.0",
     "tsx": "^4.16.2",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "vite": "^5.4.21",
+    "vitest": "^2.0.0"
   }
 }
