@@ -188,3 +188,15 @@ Records completed implementation slices committed with the repo-local Git workfl
 - Test result: passed
 - Commit hash: ed8333d
 
+## 2026-06-11T10:58:14Z - add large stress dataset generation and validation
+
+- Test command: `npm run build && npm run stress:generate-data && DATA_DIR=data_stress npm run data:import && DATA_DIR=data_stress npm run stress:validate-data && node dist/backend/server.js + DATA_DIR=data_stress npm run stress:validate-api`
+- Test result: passed
+- Commit hash: pending
+
+## 2026-06-11T12:09:46Z - convert stress and cache checks to vitest
+
+- Test command: `npm run build && DATA_DIR=data_stress npm run stress:validate-data && node dist/backend/server.js + DATA_DIR=data_stress npm run stress:validate-api && STRESS_REQUESTS=40 STRESS_CONCURRENCY=10 npm run stress:api && CACHE_STRESS_WARM_REQUESTS=4 npm run stress:cache`
+- Test result: passed
+- Commit hash: pending
+

@@ -1,69 +1,144 @@
-const API_URL = process.env.API_URL ?? 'http://localhost:3000';
+import { afterAll, describe, expect, it } from 'vitest';
+import { expectOk, patch } from './helpers/api.js';
+import { getAnySupplierId, getPendingOrderForPatch } from './helpers/fixture.js';
+import { percentile } from './helpers/metrics.js';
+import { startServer, type StartedServer } from './helpers/server.js';
 
-async function timedJson(path: string): Promise<{ ms: number; body: unknown }> {
-  const started = performance.now();
-  const response = await fetch(`${API_URL}${path}`, { headers: { Accept: 'application/json' } });
-  const body = await response.json();
-  if (!response.ok) {
-    throw new Error(`${path} failed with ${response.status}: ${JSON.stringify(body)}`);
-  }
-  return { ms: performance.now() - started, body };
+const WARM_REQUESTS = Number(process.env.CACHE_STRESS_WARM_REQUESTS ?? 8);
+const DISABLED_PORT = Number(process.env.CACHE_STRESS_DISABLED_PORT ?? 3101);
+const ENABLED_PORT = Number(process.env.CACHE_STRESS_ENABLED_PORT ?? 3102);
+
+interface CacheSummary {
+  label: string;
+  endpoint: string;
+  mode: 'redis-disabled' | 'redis-enabled';
+  cold_ms: number;
+  warm_avg_ms: number;
+  warm_p95_ms: number;
+  improvement_vs_disabled_pct?: number;
 }
 
-async function patchJson(path: string, body: unknown): Promise<unknown> {
-  const response = await fetch(`${API_URL}${path}`, {
-    method: 'PATCH',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(`${path} failed with ${response.status}: ${JSON.stringify(payload)}`);
-  }
-  return payload;
+const servers: StartedServer[] = [];
+
+afterAll(async () => {
+  await Promise.all(servers.map((server) => server.stop()));
+});
+
+async function timeJson(baseUrl: string, endpoint: string): Promise<{ ms: number; body: unknown }> {
+  const response = await expectOk(baseUrl, endpoint);
+  return { ms: response.responseTime, body: response.data };
 }
 
-async function sample(path: string): Promise<void> {
-  const cold = await timedJson(path);
-  const warm = await timedJson(path);
-  console.log(
-    JSON.stringify(
-      {
-        endpoint: path,
-        cold_ms: Number(cold.ms.toFixed(2)),
-        warm_ms: Number(warm.ms.toFixed(2)),
-        same_shape: JSON.stringify(Object.keys(cold.body as Record<string, unknown>).sort()) ===
-          JSON.stringify(Object.keys(warm.body as Record<string, unknown>).sort()),
-      },
-      null,
-      2,
-    ),
+async function sampleEndpoint(
+  baseUrl: string,
+  endpoint: string,
+  mode: CacheSummary['mode'],
+  label: string,
+): Promise<CacheSummary & { coldBody: unknown; warmBody: unknown }> {
+  const cold = await timeJson(baseUrl, endpoint);
+
+  // Explicit test-controlled warm-up: the app itself remains lazy/cold-start cache-aside.
+  await timeJson(baseUrl, endpoint);
+
+  const warmDurations: number[] = [];
+  let warmBody: unknown = cold.body;
+  for (let index = 0; index < WARM_REQUESTS; index += 1) {
+    const warm = await timeJson(baseUrl, endpoint);
+    warmDurations.push(warm.ms);
+    warmBody = warm.body;
+  }
+
+  const warmAvg = warmDurations.reduce((sum, value) => sum + value, 0) / warmDurations.length;
+  return {
+    label,
+    endpoint,
+    mode,
+    cold_ms: Number(cold.ms.toFixed(2)),
+    warm_avg_ms: Number(warmAvg.toFixed(2)),
+    warm_p95_ms: Number(percentile(warmDurations, 95).toFixed(2)),
+    coldBody: cold.body,
+    warmBody,
+  };
+}
+
+function printCacheSummaries(summaries: CacheSummary[]): void {
+  console.log('\nCache comparison summary (app startup is cold/lazy; warm-up is test-controlled)');
+  console.table(
+    summaries.map((summary) => ({
+      label: summary.label,
+      endpoint: summary.endpoint,
+      mode: summary.mode,
+      cold_ms: summary.cold_ms,
+      warm_avg_ms: summary.warm_avg_ms,
+      warm_p95_ms: summary.warm_p95_ms,
+      improvement_vs_disabled_pct: summary.improvement_vs_disabled_pct ?? 'baseline',
+    })),
   );
 }
 
-await sample('/api/orders/stats');
-await sample('/api/orders/anomalies');
-await sample('/api/suppliers/sup_042/performance');
+describe('Redis response cache stress', () => {
+  it('shows warm-cache effect with extra focus on required aggregation endpoint', async () => {
+    const namespace = `reeco-stress-${Date.now()}`;
+    const disabled = await startServer({ PORT: String(DISABLED_PORT), REDIS_ENABLED: 'false' });
+    servers.push(disabled);
+    const enabled = await startServer({
+      PORT: String(ENABLED_PORT),
+      REDIS_ENABLED: 'true',
+      CACHE_TTL_SECONDS: '60',
+      CACHE_MAX_ENTRIES: '500',
+      CACHE_NAMESPACE: namespace,
+    });
+    servers.push(enabled);
 
-const orderBefore = (await timedJson('/api/orders?status=pending&limit=1')).body as { data?: Array<{ id: string; priority: string }> };
-const order = orderBefore.data?.[0];
-if (order) {
-  await timedJson('/api/orders/stats');
-  await patchJson(`/api/orders/${encodeURIComponent(order.id)}`, {
-    priority: order.priority === 'low' ? 'medium' : 'low',
+    const supplierId = await getAnySupplierId(enabled.baseUrl);
+    const endpoints = [
+      { label: 'required aggregation cache target', endpoint: '/api/orders/stats' },
+      { label: 'secondary anomaly aggregate', endpoint: '/api/orders/anomalies' },
+      { label: 'secondary supplier aggregate', endpoint: `/api/suppliers/${encodeURIComponent(supplierId)}/performance` },
+    ];
+
+    const summaries: CacheSummary[] = [];
+    for (const item of endpoints) {
+      const disabledSummary = await sampleEndpoint(disabled.baseUrl, item.endpoint, 'redis-disabled', item.label);
+      const enabledSummary = await sampleEndpoint(enabled.baseUrl, item.endpoint, 'redis-enabled', item.label);
+
+      enabledSummary.improvement_vs_disabled_pct = Number(
+        Math.max(0, ((disabledSummary.warm_avg_ms - enabledSummary.warm_avg_ms) / disabledSummary.warm_avg_ms) * 100).toFixed(2),
+      );
+
+      expect(Object.keys(enabledSummary.coldBody as Record<string, unknown>).sort()).toEqual(
+        Object.keys(enabledSummary.warmBody as Record<string, unknown>).sort(),
+      );
+
+      summaries.push(disabledSummary, enabledSummary);
+    }
+
+    printCacheSummaries(summaries);
+
+    const statsDisabled = summaries.find(
+      (summary) => summary.endpoint === '/api/orders/stats' && summary.mode === 'redis-disabled',
+    );
+    const statsEnabled = summaries.find(
+      (summary) => summary.endpoint === '/api/orders/stats' && summary.mode === 'redis-enabled',
+    );
+    expect(statsDisabled).toBeTruthy();
+    expect(statsEnabled).toBeTruthy();
+    expect(statsEnabled!.warm_avg_ms, 'required aggregation endpoint should benefit from warm Redis cache').toBeLessThan(
+      statsDisabled!.warm_avg_ms,
+    );
+
+    const patchTarget = await getPendingOrderForPatch(enabled.baseUrl);
+    if (patchTarget) {
+      await timeJson(enabled.baseUrl, '/api/orders/stats');
+      const patchResponse = await patch(enabled.baseUrl, `/api/orders/${encodeURIComponent(patchTarget.id)}`, {
+        priority: patchTarget.priority === 'low' ? 'medium' : 'low',
+        version: patchTarget.version,
+      });
+      expect(patchResponse.ok, JSON.stringify(patchResponse.data)).toBe(true);
+      const afterInvalidation = await timeJson(enabled.baseUrl, '/api/orders/stats');
+      console.log(
+        `Cache invalidation check: patched ${patchTarget.id}, then /api/orders/stats returned in ${afterInvalidation.ms.toFixed(2)}ms`,
+      );
+    }
   });
-  const afterInvalidation = await timedJson('/api/orders/stats');
-  console.log(
-    JSON.stringify(
-      {
-        invalidation_check: 'patched order then read stats',
-        order_id: order.id,
-        stats_after_patch_ms: Number(afterInvalidation.ms.toFixed(2)),
-      },
-      null,
-      2,
-    ),
-  );
-} else {
-  console.log('No pending order found for invalidation check; skipped write invalidation sample.');
-}
+});

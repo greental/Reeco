@@ -13,3 +13,5 @@ tools/__pycache__/
 tools/*.pyc
 .vscode/
 *.session.sql
+data_stress/*.csv
+data_stress/manifest.json
