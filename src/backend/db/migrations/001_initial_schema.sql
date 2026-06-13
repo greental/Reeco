@@ -37,12 +37,13 @@ CREATE TABLE IF NOT EXISTS orders (
   updated_at TIMESTAMPTZ NOT NULL,
   warehouse TEXT,
   notes TEXT,
+  flagged BOOLEAN NOT NULL DEFAULT false,
   version INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS jobs (
   id TEXT PRIMARY KEY,
-  status TEXT NOT NULL CHECK (status IN ('processing', 'completed', 'failed')),
+  status TEXT NOT NULL CHECK (status IN ('queued', 'processing', 'completed', 'failed')),
   action TEXT NOT NULL,
   reason TEXT,
   total INTEGER NOT NULL DEFAULT 0,

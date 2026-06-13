@@ -1,7 +1,7 @@
 import { get } from './api.js';
 
 interface JobStatus {
-  status: 'processing' | 'completed' | 'failed';
+  status: 'queued' | 'processing' | 'completed' | 'failed';
   progress: {
     total: number;
     completed: number;

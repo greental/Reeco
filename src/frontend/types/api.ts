@@ -21,6 +21,7 @@ export interface OrderDto {
   updated_at: string;
   warehouse: string | null;
   notes: string | null;
+  flagged?: boolean;
   version: number;
 }
 

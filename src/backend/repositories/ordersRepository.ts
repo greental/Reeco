@@ -53,6 +53,7 @@ export interface OrderListRow {
   updated_at: Date;
   warehouse: string | null;
   notes: string | null;
+  flagged: boolean;
   version: number;
 }
 
@@ -207,7 +208,7 @@ export class OrdersRepository extends BaseRepository {
           SELECT o.id, o.supplier_id, o.product_id, o.quantity,
                  o.unit_price::float AS unit_price,
                  o.total_price::float AS total_price,
-                 o.status, o.priority, o.created_at, o.updated_at, o.warehouse, o.notes, o.version,
+                 o.status, o.priority, o.created_at, o.updated_at, o.warehouse, o.notes, o.flagged, o.version,
                  NULL::text AS supplier_name,
                  ${includesProductSearch ? 'p.name' : 'NULL::text'} AS product_name
           FROM orders o
@@ -236,7 +237,7 @@ export class OrdersRepository extends BaseRepository {
     return this.one<OrderDetailRow>(
       `
         SELECT o.id, o.supplier_id, o.product_id, o.quantity, o.unit_price, o.total_price,
-               o.status, o.priority, o.created_at, o.updated_at, o.warehouse, o.notes, o.version,
+               o.status, o.priority, o.created_at, o.updated_at, o.warehouse, o.notes, o.flagged, o.version,
                s.name AS supplier_name,
                p.name AS product_name
         FROM orders o
@@ -420,7 +421,7 @@ export class OrdersRepository extends BaseRepository {
             AND version = $${versionParam}
             AND status <> 'cancelled'
           RETURNING id, supplier_id, product_id, quantity, unit_price, total_price,
-                    status, priority, created_at, updated_at, warehouse, notes, version
+                    status, priority, created_at, updated_at, warehouse, notes, flagged, version
         )
         SELECT u.*, s.name AS supplier_name, p.name AS product_name
         FROM updated u

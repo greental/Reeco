@@ -8,7 +8,7 @@ import { createPool } from './pool.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '../../..');
-const dataDir = path.join(rootDir, 'data');
+const dataDir = process.env.DATA_DIR ? path.resolve(rootDir, process.env.DATA_DIR) : path.join(rootDir, 'data');
 
 const DEFAULT_BATCH_SIZE = 1000;
 
@@ -99,6 +99,15 @@ async function resetTables(client: DbClient): Promise<void> {
   await client.query(
     'TRUNCATE job_items, jobs, orders, products, categories, suppliers RESTART IDENTITY CASCADE',
   );
+}
+
+async function ensureRuntimeSchema(client: DbClient): Promise<void> {
+  await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS flagged BOOLEAN NOT NULL DEFAULT false`);
+  await client.query(`ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_status_check`);
+  await client.query(`
+    ALTER TABLE jobs
+    ADD CONSTRAINT jobs_status_check CHECK (status IN ('queued', 'processing', 'completed', 'failed'))
+  `);
 }
 
 async function bulkInsert(
@@ -368,6 +377,7 @@ export async function importData(): Promise<void> {
   try {
     await client.query('BEGIN');
 
+    await ensureRuntimeSchema(client);
     await resetTables(client);
 
     const counts: ImportCounts = {
