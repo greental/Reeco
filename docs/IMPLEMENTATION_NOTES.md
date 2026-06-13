@@ -86,4 +86,6 @@ Root wrapper scripts should be added in a later setup slice so agents can run th
 - Project-owned stress checks now use Vitest and fixture-aware helpers, so supplier performance stress does not hard-code `sup_042` and works against generated `stress_sup_*` IDs.
 - Cache stress gives explicit priority to the assignment aggregation endpoint, `GET /api/orders/stats`, comparing Redis-disabled and Redis-enabled warm reads. The app intentionally remains cold/lazy cache-aside on startup; warm-up is test-controlled.
 - Malformed JSON request bodies now return the normal JSON API error shape instead of Express's default HTML error response.
-- Next recommended slice: run full verification/grade from a clean official `data/` import and record the final result.
+- Final ordered assignment verification passed with `npm test` after starting the built server and re-importing the official `data/` fixture before each suite.
+- The provided `npm run grade` wrapper could not complete in this checkout because `tests/package.json` invokes `node grade.js`, but `tests/grade.js` is not present. The underlying ordered suites all pass via `npm test`.
+- Next recommended slice: stop local server processes, restore the official `data/` import one last time, verify Git status, and prepare the repository for submission.
