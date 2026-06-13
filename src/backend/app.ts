@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'node:path';
 import { apiRouter } from './routes/api.js';
 import { sendError } from './http/responses.js';
+import { jsonErrorMiddleware } from './http/errorMiddleware.js';
 
 export function createApp() {
   const app = express();
@@ -26,6 +27,8 @@ export function createApp() {
   app.use((_req, res) => {
     sendError(res, 404, 'Route not found', 'NOT_FOUND');
   });
+
+  app.use(jsonErrorMiddleware);
 
   return app;
 }
