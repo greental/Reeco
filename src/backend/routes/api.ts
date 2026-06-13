@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { cached, invalidateApiCache, makeCacheKey } from '../cache/responseCache.js';
 import { sendError } from '../http/responses.js';
 import { addEventsClient, publishEvent } from '../realtime/events.js';
@@ -28,6 +29,73 @@ const ordersRepository = new OrdersRepository();
 const suppliersRepository = new SuppliersRepository();
 const productsRepository = new ProductsRepository();
 const jobsRepository = new JobsRepository();
+
+const SortFieldSchema = z.enum([
+  'id',
+  'supplier_id',
+  'product_id',
+  'quantity',
+  'unit_price',
+  'total_price',
+  'status',
+  'priority',
+  'created_at',
+  'updated_at',
+  'warehouse',
+]);
+const SortDirectionSchema = z.enum(['asc', 'desc']);
+const OptionalTrimmedStringSchema = z.string().trim().min(1).optional();
+const DateStringSchema = z.string().trim().refine((value) => !Number.isNaN(Date.parse(value)), 'Invalid date').optional();
+const PaginationQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(MAX_LIMIT).optional().default(DEFAULT_LIMIT),
+  offset: z.coerce.number().int().nonnegative().optional().default(0),
+});
+const OrderQuerySchema = PaginationQuerySchema.extend({
+  status: z.string().trim().optional(),
+  priority: z.enum(ORDER_PRIORITIES).optional(),
+  supplier_id: OptionalTrimmedStringSchema,
+  warehouse: OptionalTrimmedStringSchema,
+  date_from: DateStringSchema,
+  date_to: DateStringSchema,
+  min_total: z.coerce.number().nonnegative().optional(),
+  search: OptionalTrimmedStringSchema,
+  sort: SortFieldSchema.optional().default('id'),
+  order: SortDirectionSchema.optional().default('asc'),
+}).superRefine((value, ctx) => {
+  if (value.status) {
+    for (const status of value.status.split(',').map((item) => item.trim()).filter(Boolean)) {
+      if (!ORDER_STATUSES.includes(status as OrderStatus)) {
+        ctx.addIssue({ code: 'custom', path: ['status'], message: `Invalid status: ${status}` });
+      }
+    }
+  }
+});
+const PatchOrderSchema = z.object({
+  status: z.enum(ORDER_STATUSES).optional(),
+  priority: z.enum(ORDER_PRIORITIES).optional(),
+  version: z.coerce.number().int().positive().optional(),
+  expectedVersion: z.coerce.number().int().positive().optional(),
+  expected_version: z.coerce.number().int().positive().optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.version === undefined && value.expectedVersion === undefined && value.expected_version === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['version'], message: 'Expected version is required' });
+  }
+});
+const BulkActionSchema = z.object({
+  action: z.enum(BULK_ACTIONS),
+  orderIds: z.array(z.string().trim().min(1)).optional(),
+  order_ids: z.array(z.string().trim().min(1)).optional(),
+  reason: z.string().trim().max(500).optional(),
+}).strict().superRefine((value, ctx) => {
+  const ids = value.orderIds ?? value.order_ids;
+  if (!ids || ids.length === 0 || ids.length > 10_000) {
+    ctx.addIssue({ code: 'custom', path: ['orderIds'], message: 'orderIds must contain 1-10000 ids' });
+  }
+});
+
+function sendValidationError(res: Parameters<typeof sendError>[0], error: z.ZodError): void {
+  sendError(res, 400, `Invalid request: ${error.issues.map((issue) => issue.message).join('; ')}`, 'VALIDATION_ERROR');
+}
 
 const ORDER_SORT_FIELDS = new Set<OrderSortField>([
   'id',
@@ -147,13 +215,25 @@ apiRouter.get('/events', (req, res) => {
 
 apiRouter.get('/orders', async (req, res) => {
   try {
-    const pagination = getPagination(req.query);
-    const filters = getOrderFilters(req.query);
-    if (!filters) {
-      sendError(res, 400, 'Invalid order filter', 'INVALID_FILTER');
+    const parsed = OrderQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      sendValidationError(res, parsed.error);
       return;
     }
-
+    const { limit, offset, status, priority, supplier_id, warehouse, date_from, date_to, min_total, search, sort, order } = parsed.data;
+    const filters: OrderFilters = {
+      statuses: status?.split(',').map((item) => item.trim()).filter(Boolean) as OrderStatus[] | undefined,
+      priority,
+      supplierId: supplier_id,
+      warehouse,
+      dateFrom: date_from,
+      dateTo: date_to,
+      minTotal: min_total,
+      search,
+      sort,
+      order,
+    };
+    const pagination = { limit, offset };
     const result = await ordersRepository.list(pagination, filters);
     res.json({ ...result, ...pagination });
   } catch (error) {
@@ -197,31 +277,15 @@ apiRouter.get('/orders/:id', async (req, res) => {
 
 apiRouter.patch('/orders/:id', async (req, res) => {
   try {
-    const body = req.body as Record<string, unknown>;
-    const patch: OrderPatch = {};
-
-    if (Object.prototype.hasOwnProperty.call(body, 'status')) {
-      if (!isOrderStatus(body.status)) {
-        sendError(res, 400, 'Invalid order status', 'INVALID_STATUS');
-        return;
-      }
-      patch.status = body.status;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(body, 'priority')) {
-      if (!isOrderPriority(body.priority)) {
-        sendError(res, 400, 'Invalid order priority', 'INVALID_PRIORITY');
-        return;
-      }
-      patch.priority = body.priority;
-    }
-
-    const versionValue = body.version ?? body.expectedVersion ?? body.expected_version;
-    const expectedVersion = typeof versionValue === 'number' ? versionValue : Number(versionValue);
-    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
-      sendError(res, 400, 'Expected order version is required', 'VERSION_REQUIRED');
+    const parsed = PatchOrderSchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendValidationError(res, parsed.error);
       return;
     }
+    const patch: OrderPatch = {};
+    if (parsed.data.status !== undefined) patch.status = parsed.data.status;
+    if (parsed.data.priority !== undefined) patch.priority = parsed.data.priority;
+    const expectedVersion = parsed.data.version ?? parsed.data.expectedVersion ?? parsed.data.expected_version!;
 
     const before = patch.status ? await ordersRepository.getById(req.params.id) : null;
     const result = await ordersRepository.patch(req.params.id, patch, expectedVersion);
@@ -262,15 +326,13 @@ apiRouter.patch('/orders/:id', async (req, res) => {
 
 async function handleBulkAction(req: Parameters<Parameters<typeof apiRouter.post>[1]>[0], res: Parameters<Parameters<typeof apiRouter.post>[1]>[1]) {
   try {
-    const body = req.body as Record<string, unknown>;
-    const orderIds = getBulkOrderIds(body);
-    if (!orderIds || orderIds.length === 0 || orderIds.length > 10_000 || !isBulkAction(body.action)) {
-      sendError(res, 400, 'Invalid bulk action request', 'INVALID_BULK_ACTION');
+    const parsed = BulkActionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      sendValidationError(res, parsed.error);
       return;
     }
-
-    const reason = typeof body.reason === 'string' ? body.reason : undefined;
-    const jobId = await jobsRepository.createBulkJob(orderIds, body.action, reason);
+    const orderIds = parsed.data.orderIds ?? parsed.data.order_ids!;
+    const jobId = await jobsRepository.createBulkJob(orderIds, parsed.data.action, parsed.data.reason);
     res.status(202).json({ jobId, job_id: jobId });
   } catch (error) {
     sendError(res, 500, getErrorMessage(error), 'INTERNAL_ERROR');
