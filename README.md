@@ -9,7 +9,7 @@ This repository contains a completed Node.js/TypeScript + PostgreSQL implementat
 - Express REST API under `/api` for orders, suppliers, products, analytics, anomaly detection, bulk jobs, and realtime events.
 - PostgreSQL migrations and CSV import scripts for the provided `data/` files.
 - Server-Sent Events endpoint at `/api/events` for `order_updated` and `bulk_completed` notifications.
-- Static procurement dashboard served from `src/frontend/static` with filtering, sorting, pagination, order updates, supplier detail, bulk actions, and realtime activity.
+- React + TypeScript procurement dashboard built by Vite and served by the Express app, with filtering, sorting, pagination, order updates, supplier detail, bulk actions, and realtime activity.
 - Required qualitative-review docs:
   - [`ARCHITECTURE.md`](./ARCHITECTURE.md)
   - [`ANOMALY_STRATEGY.md`](./ANOMALY_STRATEGY.md)
@@ -67,7 +67,7 @@ Operational notes:
 - `.env.example` matches the default Docker PostgreSQL connection.
 - Tests mutate order state, so rerun `npm run data:import` when you need a clean fixture baseline.
 - `Redis` is available from `docker-compose.yml` and can be enabled as an optional LRU-style API response cache with `REDIS_ENABLED=true`.
-- The frontend is static JavaScript rather than React to reduce build complexity while still covering the requested dashboard workflows.
+- The frontend is a React + TypeScript app built into `dist/frontend` for production. The legacy static dashboard remains under `src/frontend/static` only as a development fallback.
 
 ### Optional Redis response cache
 
@@ -98,9 +98,19 @@ The official assignment tests in `tests/` are not modified. Additional local str
 ```bash
 npm run stress:api
 npm run stress:cache
+npm run stress:generate-data
+DATA_DIR=data_stress npm run data:import
+DATA_DIR=data_stress npm run stress:validate-data
+DATA_DIR=data_stress npm run stress:validate-api
 ```
 
-These scripts assume the server is already running and accept `API_URL`, `STRESS_REQUESTS`, and `STRESS_CONCURRENCY` environment overrides.
+`stress:api` assumes the server is already running and accepts `API_URL`, `STRESS_REQUESTS`, and `STRESS_CONCURRENCY` environment overrides. `stress:cache` builds the app and starts isolated Redis-disabled/Redis-enabled server processes for comparison.
+
+Generated stress CSVs and `data_stress/manifest.json` are intentionally ignored by Git. After importing the large stress fixture, restore the official assignment fixture before grading with:
+
+```bash
+npm run data:import
+```
 
 ---
 

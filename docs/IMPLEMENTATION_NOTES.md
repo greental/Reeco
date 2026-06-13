@@ -85,4 +85,5 @@ Root wrapper scripts should be added in a later setup slice so agents can run th
 - Latest stress data verification generated 200,000 order rows, imported 196,000 valid orders while skipping 4,000 malformed rows, and passed both `stress:validate-data` and `stress:validate-api`.
 - Project-owned stress checks now use Vitest and fixture-aware helpers, so supplier performance stress does not hard-code `sup_042` and works against generated `stress_sup_*` IDs.
 - Cache stress gives explicit priority to the assignment aggregation endpoint, `GET /api/orders/stats`, comparing Redis-disabled and Redis-enabled warm reads. The app intentionally remains cold/lazy cache-aside on startup; warm-up is test-controlled.
-- Next recommended slice: restore the official `data/` import before final grading, run full verification, and final commit/package.
+- Malformed JSON request bodies now return the normal JSON API error shape instead of Express's default HTML error response.
+- Next recommended slice: run full verification/grade from a clean official `data/` import and record the final result.

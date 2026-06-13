@@ -192,11 +192,17 @@ Records completed implementation slices committed with the repo-local Git workfl
 
 - Test command: `npm run build && npm run stress:generate-data && DATA_DIR=data_stress npm run data:import && DATA_DIR=data_stress npm run stress:validate-data && node dist/backend/server.js + DATA_DIR=data_stress npm run stress:validate-api`
 - Test result: passed
-- Commit hash: pending
+- Commit hash: c46e253
 
 ## 2026-06-11T12:09:46Z - convert stress and cache checks to vitest
 
 - Test command: `npm run build && DATA_DIR=data_stress npm run stress:validate-data && node dist/backend/server.js + DATA_DIR=data_stress npm run stress:validate-api && STRESS_REQUESTS=40 STRESS_CONCURRENCY=10 npm run stress:api && CACHE_STRESS_WARM_REQUESTS=4 npm run stress:cache`
 - Test result: passed
-- Commit hash: pending
+- Commit hash: c46e253
+
+## 2026-06-13T12:33:37Z - return JSON for malformed request bodies
+
+- Test command: `npm run build && npm run test:basic && npm run test:security`
+- Test result: passed
+- Commit hash: d6bb473
 

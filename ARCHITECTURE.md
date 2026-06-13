@@ -9,18 +9,18 @@ The project intentionally keeps the architecture simple and assignment-focused:
 ```text
 src/
   backend/   Express + TypeScript REST API, PostgreSQL repositories, SSE events
-  frontend/  Static browser dashboard served by the same Express app
+  frontend/  React + TypeScript dashboard built by Vite and served by Express
   shared/    Reserved for shared types/utilities if the project grows
 data/        Provided CSV fixtures, treated as read-only source data
 tests/       Provided assignment test suite, not modified
 tools/       Local scripts for migration, import, smoke tests, and test orchestration
 ```
 
-The backend listens on port `3000` by default and exposes all API routes under `/api`. The same Express process serves the static dashboard from `src/frontend/static`.
+The backend listens on port `3000` by default and exposes all API routes under `/api`. In production, the same Express process serves the Vite-built frontend from `dist/frontend`; in development it can fall back to `src/frontend/static`.
 
 ## Backend structure
 
-- `src/backend/app.ts` creates the Express app, mounts JSON parsing, API routes, static frontend assets, and a consistent 404 handler.
+- `src/backend/app.ts` creates the Express app, mounts JSON parsing, API routes, frontend assets, consistent 404 handling, and JSON error middleware for malformed request bodies.
 - `src/backend/server.ts` loads configuration and starts the HTTP server.
 - `src/backend/routes/api.ts` owns request parsing, validation, response shaping, and route-level error handling.
 - `src/backend/repositories/*Repository.ts` isolates SQL and persistence logic by domain:
@@ -193,13 +193,14 @@ SSE was chosen over WebSockets because the assignment only needs server-to-clien
 
 ## Frontend structure
 
-The frontend is a dependency-free static dashboard in `src/frontend/static`:
+The submitted frontend is a React + TypeScript dashboard under `src/frontend`:
 
-- `index.html` defines the dashboard shell.
-- `styles.css` provides responsive layout and status styling.
-- `app.js` calls the REST API, renders dashboard metrics, handles filters/pagination/sorting, supports order detail updates, shows supplier performance, runs bulk actions, polls jobs, and displays SSE activity.
+- `main.tsx` mounts the app.
+- `App.tsx` renders dashboard metrics, order filtering/pagination/sorting, order updates, supplier detail, bulk actions, job polling, and realtime activity.
+- `api/*` contains typed API helpers.
+- `types/api.ts` contains DTO types shared across the frontend modules.
 
-Although the README allows React, the submitted app keeps the UI static to minimize build complexity and dependencies while still demonstrating the required procurement workflows.
+Vite builds the frontend into `dist/frontend`, which Express serves in production. The older `src/frontend/static` files remain as a lightweight development fallback only.
 
 ## Security considerations
 
@@ -207,12 +208,12 @@ Although the README allows React, the submitted app keeps the UI static to minim
 - Sort columns and directions are allowlisted.
 - JSON body size is capped at `1mb`.
 - Notes and other user-controlled text are escaped in the frontend before insertion into HTML.
-- API responses are JSON for API routes.
+- API responses are JSON for API routes, including malformed JSON request bodies.
 
 ## Tradeoffs and future improvements
 
 - Background jobs are in-process. This is sufficient for the assignment, but not durable across process restarts.
 - Aggregations are computed directly from PostgreSQL when Redis cache is disabled; Redis can cache hot aggregate/anomaly/supplier-performance responses when enabled.
 - There is no authentication/authorization because it is outside the assignment tests.
-- The frontend is static JavaScript rather than React to keep the implementation focused and low-risk.
+- The legacy static dashboard remains only as a fallback; the submitted UI is the Vite-built React dashboard.
 - Supplier/category/product master-data cleanup is documented, but not enforced during import because the tests require preserving source data.
