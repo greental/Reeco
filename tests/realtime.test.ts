@@ -17,7 +17,7 @@ describe('Real-time Events', () => {
     await client.connect();
 
     // Find a pending order to update
-    const listRes = await get<{ data: { id: string; status: string }[] }>(
+    const listRes = await get<{ data: { id: string; status: string; version: number }[] }>(
       '/api/orders?status=pending&limit=100',
     );
     const pendingOrder = listRes.data.data.find((o) => o.status === 'pending');
@@ -27,7 +27,7 @@ describe('Real-time Events', () => {
     const eventPromise = client.waitForEvent('order_updated', 5000);
 
     // Trigger the status change
-    await patch(`/api/orders/${pendingOrder!.id}`, { status: 'approved' });
+    await patch(`/api/orders/${pendingOrder!.id}`, { status: 'approved', version: pendingOrder!.version });
 
     // Wait for the event
     const event = await eventPromise;
@@ -37,14 +37,14 @@ describe('Real-time Events', () => {
   it('order_updated event has correct shape { id, old_status, new_status, updated_at }', async () => {
     await client.connect();
 
-    const listRes = await get<{ data: { id: string; status: string }[] }>(
+    const listRes = await get<{ data: { id: string; status: string; version: number }[] }>(
       '/api/orders?status=pending&limit=100',
     );
     const pendingOrder = listRes.data.data.find((o) => o.status === 'pending');
     expect(pendingOrder).toBeDefined();
 
     const eventPromise = client.waitForEvent('order_updated', 5000);
-    await patch(`/api/orders/${pendingOrder!.id}`, { status: 'approved' });
+    await patch(`/api/orders/${pendingOrder!.id}`, { status: 'approved', version: pendingOrder!.version });
 
     const event = await eventPromise;
     expect(event.data).toHaveProperty('id');
@@ -57,7 +57,7 @@ describe('Real-time Events', () => {
     await client.connect({ supplier_id: 'sup_042' });
 
     // Find a pending order for supplier sup_042
-    const listRes = await get<{ data: { id: string; status: string; supplier_id: string }[] }>(
+    const listRes = await get<{ data: { id: string; status: string; supplier_id: string; version: number }[] }>(
       '/api/orders?status=pending&supplier_id=sup_042&limit=100',
     );
     const sup042Order = listRes.data.data.find(
@@ -66,7 +66,7 @@ describe('Real-time Events', () => {
     expect(sup042Order).toBeDefined();
 
     const eventPromise = client.waitForEvent('order_updated', 5000);
-    await patch(`/api/orders/${sup042Order!.id}`, { status: 'approved' });
+    await patch(`/api/orders/${sup042Order!.id}`, { status: 'approved', version: sup042Order!.version });
 
     const event = await eventPromise;
     expect(event.data.id).toBe(sup042Order!.id);
@@ -76,7 +76,7 @@ describe('Real-time Events', () => {
     await client.connect();
 
     // Get some pending orders for bulk action
-    const listRes = await get<{ data: { id: string; status: string }[] }>(
+    const listRes = await get<{ data: { id: string; status: string; version: number }[] }>(
       '/api/orders?status=pending&limit=5',
     );
     const orderIds = listRes.data.data
@@ -103,7 +103,7 @@ describe('Real-time Events', () => {
       await client.connect();
       await client2.connect();
 
-      const listRes = await get<{ data: { id: string; status: string }[] }>(
+      const listRes = await get<{ data: { id: string; status: string; version: number }[] }>(
         '/api/orders?status=pending&limit=100',
       );
       const pendingOrder = listRes.data.data.find((o) => o.status === 'pending');
@@ -112,7 +112,7 @@ describe('Real-time Events', () => {
       const event1Promise = client.waitForEvent('order_updated', 5000);
       const event2Promise = client2.waitForEvent('order_updated', 5000);
 
-      await patch(`/api/orders/${pendingOrder!.id}`, { status: 'approved' });
+      await patch(`/api/orders/${pendingOrder!.id}`, { status: 'approved', version: pendingOrder!.version });
 
       const [event1, event2] = await Promise.all([event1Promise, event2Promise]);
       expect(event1.type).toBe('order_updated');

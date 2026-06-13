@@ -216,8 +216,16 @@ apiRouter.patch('/orders/:id', async (req, res) => {
       patch.priority = body.priority;
     }
 
+    const versionValue = body.version ?? body.expectedVersion ?? body.expected_version;
+    const expectedVersion = typeof versionValue === 'number' ? versionValue : Number(versionValue);
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      sendError(res, 400, 'Expected order version is required', 'VERSION_REQUIRED');
+      return;
+    }
+
     const before = patch.status ? await ordersRepository.getById(req.params.id) : null;
-    const updated = await ordersRepository.patch(req.params.id, patch);
+    const result = await ordersRepository.patch(req.params.id, patch, expectedVersion);
+    const updated = result.order;
     if (updated) {
       await invalidateApiCache();
       res.json(updated);
@@ -236,13 +244,17 @@ apiRouter.patch('/orders/:id', async (req, res) => {
       return;
     }
 
-    const existing = await ordersRepository.getById(req.params.id);
-    if (!existing) {
+    if (result.conflict === 'not_found') {
       sendError(res, 404, 'Order not found', 'ORDER_NOT_FOUND');
       return;
     }
 
-    sendError(res, 409, 'Cancelled orders cannot be updated', 'ORDER_CANCELLED');
+    if (result.conflict === 'cancelled') {
+      sendError(res, 409, 'Cancelled orders cannot be updated', 'ORDER_CANCELLED');
+      return;
+    }
+
+    sendError(res, 409, 'Order version conflict', 'VERSION_CONFLICT');
   } catch (error) {
     sendError(res, 500, getErrorMessage(error), 'INTERNAL_ERROR');
   }

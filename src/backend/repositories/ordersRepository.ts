@@ -121,6 +121,13 @@ export interface OrderPatch {
   priority?: OrderPriority;
 }
 
+export type OrderPatchConflict = 'not_found' | 'cancelled' | 'version_conflict';
+
+export interface OrderPatchResult {
+  order: OrderDetailRow | null;
+  conflict?: OrderPatchConflict;
+}
+
 export const ORDER_SORT_COLUMNS: Record<OrderSortField, string> = {
   id: 'o.id',
   supplier_id: 'o.supplier_id',
@@ -381,21 +388,8 @@ export class OrdersRepository extends BaseRepository {
     return this.one<{ status: OrderStatus }>('SELECT status FROM orders WHERE id = $1', [id]);
   }
 
-  async patch(id: string, patch: OrderPatch): Promise<OrderDetailRow | null> {
+  async patch(id: string, patch: OrderPatch, expectedVersion: number): Promise<OrderPatchResult> {
     const assignments: string[] = [];
-    const guards: string[] = [`id = $1`, `status <> 'cancelled'`];
-    const params: unknown[] = [id];
-
-    if (patch.status !== undefined) {
-      guards.push(`status <> $${params.length + 1}`);
-      params.push(patch.status);
-    }
-
-    if (patch.priority !== undefined) {
-      guards.push(`priority <> $${params.length + 1}`);
-      params.push(patch.priority);
-    }
-
     const updateParams: unknown[] = [];
 
     if (patch.status !== undefined) {
@@ -409,19 +403,22 @@ export class OrdersRepository extends BaseRepository {
     }
 
     if (assignments.length === 0) {
-      return this.getById(id);
+      const order = await this.getById(id);
+      return { order, conflict: order ? undefined : 'not_found' };
     }
 
-    const whereOffset = updateParams.length;
-    const shiftedGuards = guards.map((guard) => guard.replace(/\$(\d+)/g, (_match, index: string) => `$${Number(index) + whereOffset}`));
-    const allParams = [...updateParams, ...params];
+    const idParam = updateParams.length + 1;
+    const versionParam = updateParams.length + 2;
+    const allParams = [...updateParams, id, expectedVersion];
 
-    return this.one<OrderDetailRow>(
+    const order = await this.one<OrderDetailRow>(
       `
         WITH updated AS (
           UPDATE orders
           SET ${assignments.join(', ')}, updated_at = now(), version = version + 1
-          WHERE ${shiftedGuards.join(' AND ')}
+          WHERE id = $${idParam}
+            AND version = $${versionParam}
+            AND status <> 'cancelled'
           RETURNING id, supplier_id, product_id, quantity, unit_price, total_price,
                     status, priority, created_at, updated_at, warehouse, notes, version
         )
@@ -432,6 +429,19 @@ export class OrdersRepository extends BaseRepository {
       `,
       allParams,
     );
+
+    if (order) {
+      return { order };
+    }
+
+    const existing = await this.getById(id);
+    if (!existing) {
+      return { order: null, conflict: 'not_found' };
+    }
+    if (existing.status === 'cancelled') {
+      return { order: null, conflict: 'cancelled' };
+    }
+    return { order: null, conflict: 'version_conflict' };
   }
 }
 

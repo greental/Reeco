@@ -7,17 +7,18 @@ describe('Concurrency', () => {
 
   describe('Optimistic Locking', () => {
     it('two simultaneous PATCH to same order — one gets 200, other gets 409', async () => {
-      const listRes = await get<{ data: { id: string; status: string }[] }>(
+      const listRes = await get<{ data: { id: string; status: string; version: number }[] }>(
         '/api/orders?limit=200',
       );
       const pendingOrder = listRes.data.data.find((o) => o.status === 'pending');
       expect(pendingOrder).toBeDefined();
 
       const orderId = pendingOrder!.id;
+      const version = pendingOrder!.version;
 
       const [res1, res2] = await Promise.all([
-        patch(`/api/orders/${orderId}`, { status: 'approved' }),
-        patch(`/api/orders/${orderId}`, { status: 'approved' }),
+        patch(`/api/orders/${orderId}`, { status: 'approved', version }),
+        patch(`/api/orders/${orderId}`, { status: 'approved', version }),
       ]);
 
       const statuses = [res1.status, res2.status].sort();
@@ -25,17 +26,18 @@ describe('Concurrency', () => {
     });
 
     it('409 response contains an error property', async () => {
-      const listRes = await get<{ data: { id: string; status: string }[] }>(
+      const listRes = await get<{ data: { id: string; status: string; version: number }[] }>(
         '/api/orders?limit=200',
       );
       const pendingOrder = listRes.data.data.find((o) => o.status === 'pending');
       expect(pendingOrder).toBeDefined();
 
       const orderId = pendingOrder!.id;
+      const version = pendingOrder!.version;
 
       const [res1, res2] = await Promise.all([
-        patch<{ error?: string }>(`/api/orders/${orderId}`, { status: 'approved' }),
-        patch<{ error?: string }>(`/api/orders/${orderId}`, { status: 'approved' }),
+        patch<{ error?: string }>(`/api/orders/${orderId}`, { status: 'approved', version }),
+        patch<{ error?: string }>(`/api/orders/${orderId}`, { status: 'approved', version }),
       ]);
 
       const conflictRes = res1.status === 409 ? res1 : res2;
@@ -203,7 +205,7 @@ describe('Concurrency', () => {
 
   describe('Stress', () => {
     it('10 concurrent PATCH to different orders — all succeed', async () => {
-      const listRes = await get<{ data: { id: string; status: string }[] }>(
+      const listRes = await get<{ data: { id: string; status: string; version: number }[] }>(
         '/api/orders?limit=100&offset=500',
       );
       const pendingOrders = listRes.data.data.filter((o) => o.status === 'pending');
@@ -213,7 +215,7 @@ describe('Concurrency', () => {
 
       const results = await Promise.all(
         targets.map((order) =>
-          patch(`/api/orders/${order.id}`, { status: 'approved' }),
+          patch(`/api/orders/${order.id}`, { status: 'approved', version: order.version }),
         ),
       );
 

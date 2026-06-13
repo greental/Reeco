@@ -44,7 +44,7 @@ describe('Basic CRUD Operations', () => {
     });
 
     it('PATCH /api/orders/:id updates status', async () => {
-      const listRes = await get<{ data: { id: string; status: string }[] }>(
+      const listRes = await get<{ data: { id: string; status: string; version: number }[] }>(
         '/api/orders?limit=100',
       );
       const pendingOrder = listRes.data.data.find((o) => o.status === 'pending');
@@ -52,6 +52,7 @@ describe('Basic CRUD Operations', () => {
 
       const res = await patch<Record<string, unknown>>(`/api/orders/${pendingOrder!.id}`, {
         status: 'approved',
+        version: pendingOrder!.version,
       });
 
       expect(res.status).toBe(200);
@@ -70,7 +71,7 @@ describe('Basic CRUD Operations', () => {
     });
 
     it('PATCH /api/orders/:id returns 409 if order is already cancelled', async () => {
-      const listRes = await get<{ data: { id: string; status: string }[] }>(
+      const listRes = await get<{ data: { id: string; status: string; version: number }[] }>(
         '/api/orders?limit=200',
       );
       const cancelledOrder = listRes.data.data.find((o) => o.status === 'cancelled');
@@ -78,9 +79,38 @@ describe('Basic CRUD Operations', () => {
 
       const res = await patch(`/api/orders/${cancelledOrder!.id}`, {
         status: 'approved',
+        version: cancelledOrder!.version,
       });
 
       expect(res.status).toBe(409);
+    });
+
+    it('PATCH /api/orders/:id returns 404 for missing order with expected version', async () => {
+      const res = await patch('/api/orders/ord_nonexistent_99999', {
+        status: 'approved',
+        version: 1,
+      });
+
+      expect(res.status).toBe(404);
+    });
+
+    it('PATCH /api/orders/:id accepts same-value update and increments version', async () => {
+      const listRes = await get<{ data: { id: string; status: string; priority: string; version: number }[] }>(
+        '/api/orders?limit=100',
+      );
+      const pendingOrder = listRes.data.data.find((o) => o.status === 'pending');
+      expect(pendingOrder).toBeDefined();
+
+      const res = await patch<Record<string, unknown>>(`/api/orders/${pendingOrder!.id}`, {
+        status: pendingOrder!.status,
+        priority: pendingOrder!.priority,
+        version: pendingOrder!.version,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.data.status).toBe(pendingOrder!.status);
+      expect(res.data.priority).toBe(pendingOrder!.priority);
+      expect(res.data.version).toBe(pendingOrder!.version + 1);
     });
   });
 

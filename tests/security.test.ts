@@ -6,12 +6,13 @@ describe('Security', () => {
 
   describe('Input Validation', () => {
     it('PATCH with SQL injection in status returns 400', async () => {
-      const listRes = await get<{ data: { id: string }[] }>('/api/orders');
+      const listRes = await get<{ data: { id: string; version: number }[] }>('/api/orders');
       const firstOrder = listRes.data.data[0];
       expect(firstOrder).toBeDefined();
 
       const res = await patch(`/api/orders/${firstOrder.id}`, {
         status: "'; DROP TABLE orders; --",
+        version: firstOrder.version,
       });
 
       expect(res.status).toBe(400);
@@ -46,13 +47,14 @@ describe('Security', () => {
 
   describe('XSS Prevention', () => {
     it('order notes with script tags: Content-Type is application/json and notes is a string', async () => {
-      const listRes = await get<{ data: { id: string }[] }>('/api/orders');
+      const listRes = await get<{ data: { id: string; version: number }[] }>('/api/orders');
       const firstOrder = listRes.data.data[0];
       expect(firstOrder).toBeDefined();
 
       const xssPayload = '<script>alert("xss")</script>';
       const res = await patch<Record<string, unknown>>(`/api/orders/${firstOrder.id}`, {
         notes: xssPayload,
+        version: firstOrder.version,
       });
 
       const contentType = res.headers.get('content-type') || '';
