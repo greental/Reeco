@@ -1,4 +1,5 @@
 import express from 'express';
+import fs from 'node:fs';
 import path from 'node:path';
 import { apiRouter } from './routes/api.js';
 import { sendError } from './http/responses.js';
@@ -8,7 +9,7 @@ export function createApp() {
   const app = express();
   const builtFrontendPath = path.join(process.cwd(), 'dist/frontend');
   const fallbackFrontendPath = path.join(process.cwd(), 'src/frontend/static');
-  const frontendPath = process.env.NODE_ENV === 'production' ? builtFrontendPath : fallbackFrontendPath;
+  const frontendPath = fs.existsSync(path.join(builtFrontendPath, 'index.html')) ? builtFrontendPath : fallbackFrontendPath;
 
   app.use(express.json({ limit: '1mb' }));
   app.use('/api', apiRouter);
